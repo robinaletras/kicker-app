@@ -475,17 +475,22 @@ export default function Kicker() {
     const isFlush = Object.values(suitCounts).some(count => count === 5);
     const flushSuit = isFlush ? Object.entries(suitCounts).find(([_, count]) => count === 5)?.[0] : null;
 
-    // Check for straight (5 consecutive values)
+    // Check for straight (5 UNIQUE consecutive values)
     const sortedValues = [...allCards].map(c => c.value).sort((a, b) => a - b);
-    let isStraight = true;
-    for (let i = 1; i < sortedValues.length; i++) {
-      if (sortedValues[i] !== sortedValues[i - 1] + 1) {
-        isStraight = false;
-        break;
+    const uniqueSortedValues = [...new Set(sortedValues)].sort((a, b) => a - b);
+
+    // Must have exactly 5 unique values for a straight
+    let isStraight = uniqueSortedValues.length === 5;
+    if (isStraight) {
+      for (let i = 1; i < uniqueSortedValues.length; i++) {
+        if (uniqueSortedValues[i] !== uniqueSortedValues[i - 1] + 1) {
+          isStraight = false;
+          break;
+        }
       }
     }
     // Check for A-2-3-4-5 straight (wheel)
-    const isWheel = sortedValues.join(',') === '2,3,4,5,14';
+    const isWheel = uniqueSortedValues.join(',') === '2,3,4,5,14';
     if (isWheel) isStraight = true;
 
     // Count occurrences of each value to find pairs/trips/quads
