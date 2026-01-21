@@ -62,8 +62,8 @@ const Card = ({ card, faceDown = false, small = false, highlight = false }: Card
 
   if (faceDown) {
     return (
-      <div className={`${small ? 'w-8 h-11' : 'w-12 h-16'} rounded bg-gradient-to-br from-emerald-800 to-emerald-950 border border-emerald-600 flex items-center justify-center shadow`}>
-        <div className={`text-emerald-400 ${small ? 'text-sm' : 'text-lg'} font-bold`}>K</div>
+      <div className={`${small ? 'w-11 h-16' : 'w-14 h-20'} rounded-lg bg-gradient-to-br from-emerald-800 to-emerald-950 border-2 border-emerald-600 flex items-center justify-center shadow`}>
+        <div className={`text-emerald-400 ${small ? 'text-lg' : 'text-xl'} font-bold`}>K</div>
       </div>
     );
   }
@@ -71,11 +71,11 @@ const Card = ({ card, faceDown = false, small = false, highlight = false }: Card
   if (!card) return null;
 
   return (
-    <div className={`${small ? 'w-8 h-11' : 'w-12 h-16'} rounded bg-white border ${highlight ? 'border-yellow-400 ring-1 ring-yellow-400/50' : 'border-gray-300'} flex flex-col items-center justify-center shadow transition-all duration-300`}>
-      <span className={`${small ? 'text-xs' : 'text-base'} font-bold leading-none ${isRed ? 'text-red-600' : 'text-gray-900'}`}>
+    <div className={`${small ? 'w-11 h-16' : 'w-14 h-20'} rounded-lg bg-white border-2 ${highlight ? 'border-yellow-400 ring-2 ring-yellow-400/50' : 'border-gray-300'} flex flex-col items-center justify-center shadow transition-all duration-300`}>
+      <span className={`${small ? 'text-sm' : 'text-lg'} font-bold leading-none ${isRed ? 'text-red-600' : 'text-gray-900'}`}>
         {card.rank}
       </span>
-      <span className={`${small ? 'text-sm' : 'text-lg'} leading-none ${isRed ? 'text-red-600' : 'text-gray-900'}`}>
+      <span className={`${small ? 'text-lg' : 'text-xl'} leading-none ${isRed ? 'text-red-600' : 'text-gray-900'}`}>
         {card.suit}
       </span>
     </div>
@@ -974,18 +974,18 @@ export default function Kicker() {
         {gameState === 'playing' && (
           <div className="flex-1 flex flex-col overflow-hidden">
             {/* Game Info */}
-            <div className="flex justify-between items-center mb-1 px-2 py-1 bg-gray-900/80 rounded-lg border border-emerald-800 flex-shrink-0">
+            <div className="flex justify-between items-center mb-2 px-4 py-2 bg-gray-900/80 rounded-lg border border-emerald-800 flex-shrink-0">
               <div className="text-center">
-                <div className="text-[10px] text-gray-400">Pot</div>
-                <div className="text-base font-bold text-amber-400">${pot}</div>
+                <div className="text-xs text-gray-400">Pot</div>
+                <div className="text-xl font-bold text-amber-400">${pot}</div>
               </div>
               <div className="text-center">
-                <div className="text-[10px] text-gray-400">Bet</div>
-                <div className="text-base font-bold text-red-400">${currentBetAmount}</div>
+                <div className="text-xs text-gray-400">Bet</div>
+                <div className="text-xl font-bold text-red-400">${currentBetAmount}</div>
               </div>
               <div className="text-center">
-                <div className="text-[10px] text-gray-400">Call</div>
-                <div className="text-base font-bold text-blue-400">${toCall}</div>
+                <div className="text-xs text-gray-400">Call</div>
+                <div className="text-xl font-bold text-blue-400">${toCall}</div>
               </div>
             </div>
 
@@ -1016,12 +1016,12 @@ export default function Kicker() {
               </div>
             )}
 
-            <div className="text-center mb-1 text-[10px] text-gray-300 flex-shrink-0">{message}</div>
+            <div className="text-center mb-2 text-xs text-gray-300 flex-shrink-0">{message}</div>
 
             {/* Current Player Actions */}
-            <div className="p-1.5 bg-amber-900/40 rounded-lg border border-amber-400 mb-1 flex-shrink-0">
+            <div className="p-2 bg-amber-900/40 rounded-lg border border-amber-400 mb-2 flex-shrink-0">
               <div className="text-center mb-1">
-                <span className="text-amber-400 font-bold text-sm">{currentPlayerData.name}'s Turn</span>
+                <span className="text-amber-400 font-bold">{currentPlayerData.name}'s Turn</span>
                 {currentPlayerData.aiLevel && (
                   <span className="text-cyan-400 ml-1 text-xs">({currentPlayerData.aiLevel})</span>
                 )}
@@ -1144,16 +1144,16 @@ export default function Kicker() {
                   )}
 
                   {/* Actions */}
-                  <div className="space-y-1">
+                  <div className="space-y-1.5">
                 {canBet && (
-                  <div className="grid grid-cols-3 gap-1">
-                    <button onClick={() => handleAction('bet', 1)} className="px-1 py-1 bg-green-600 hover:bg-green-500 rounded text-xs font-bold transition-colors">
+                  <div className="grid grid-cols-3 gap-1.5">
+                    <button onClick={() => handleAction('bet', 1)} className="px-2 py-2 bg-green-600 hover:bg-green-500 rounded-lg text-sm font-bold transition-colors">
                       Bet $1
                     </button>
-                    <button onClick={() => handleAction('bet', 2)} className="px-1 py-1 bg-green-600 hover:bg-green-500 rounded text-xs font-bold transition-colors">
+                    <button onClick={() => handleAction('bet', 2)} className="px-2 py-2 bg-green-600 hover:bg-green-500 rounded-lg text-sm font-bold transition-colors">
                       Bet $2
                     </button>
-                    <button onClick={() => handleAction('bet', 3)} className="px-1 py-1 bg-green-600 hover:bg-green-500 rounded text-xs font-bold transition-colors">
+                    <button onClick={() => handleAction('bet', 3)} className="px-2 py-2 bg-green-600 hover:bg-green-500 rounded-lg text-sm font-bold transition-colors">
                       Bet $3
                     </button>
                   </div>
@@ -1162,53 +1162,53 @@ export default function Kicker() {
                 {canCall && (
                   <button
                     onClick={() => handleAction('call')}
-                    className="w-full px-1 py-1 bg-blue-600 hover:bg-blue-500 rounded text-xs font-bold transition-colors"
+                    className="w-full px-2 py-2 bg-blue-600 hover:bg-blue-500 rounded-lg text-sm font-bold transition-colors"
                   >
                     Call ${toCall}
                   </button>
                 )}
 
                 {canRaise && (
-                  <div className="grid grid-cols-3 gap-1">
+                  <div className="grid grid-cols-3 gap-1.5">
                     <button
                       onClick={() => handleAction('raise', 1)}
-                      className="px-1 py-1 bg-orange-600 hover:bg-orange-500 rounded text-xs font-bold transition-colors"
+                      className="px-2 py-2 bg-orange-600 hover:bg-orange-500 rounded-lg text-sm font-bold transition-colors"
                     >
                       +$1
                     </button>
                     <button
                       onClick={() => handleAction('raise', 2)}
-                      className="px-1 py-1 bg-orange-600 hover:bg-orange-500 rounded text-xs font-bold transition-colors"
+                      className="px-2 py-2 bg-orange-600 hover:bg-orange-500 rounded-lg text-sm font-bold transition-colors"
                     >
                       +$2
                     </button>
                     <button
                       onClick={() => handleAction('raise', 3)}
-                      className="px-1 py-1 bg-orange-600 hover:bg-orange-500 rounded text-xs font-bold transition-colors"
+                      className="px-2 py-2 bg-orange-600 hover:bg-orange-500 rounded-lg text-sm font-bold transition-colors"
                     >
                       +$3
                     </button>
                   </div>
                 )}
 
-                <div className={`grid ${canCheck ? 'grid-cols-3' : 'grid-cols-2'} gap-1`}>
+                <div className={`grid ${canCheck ? 'grid-cols-3' : 'grid-cols-2'} gap-1.5`}>
                   <button
                     onClick={() => handleAction('peek')}
-                    className="px-1 py-1 bg-purple-600 hover:bg-purple-500 rounded text-xs font-bold transition-colors"
+                    className="px-2 py-2 bg-purple-600 hover:bg-purple-500 rounded-lg text-sm font-bold transition-colors"
                   >
                     Peek $1
                   </button>
                   {canCheck && (
                     <button
                       onClick={() => handleAction('check')}
-                      className="px-1 py-1 bg-gray-600 hover:bg-gray-500 rounded text-xs font-bold transition-colors"
+                      className="px-2 py-2 bg-gray-600 hover:bg-gray-500 rounded-lg text-sm font-bold transition-colors"
                     >
                       Check
                     </button>
                   )}
                   <button
                     onClick={() => handleAction('fold')}
-                    className="px-1 py-1 bg-red-600 hover:bg-red-500 rounded text-xs font-bold transition-colors"
+                    className="px-2 py-2 bg-red-600 hover:bg-red-500 rounded-lg text-sm font-bold transition-colors"
                   >
                     Fold
                   </button>
@@ -1219,29 +1219,29 @@ export default function Kicker() {
             </div>
 
             {/* Your Card (for active player) */}
-            <div className="p-1.5 bg-amber-900/30 rounded-lg mb-1 flex-shrink-0 border border-amber-400/50">
-              <div className="flex justify-center items-center gap-2">
-                <span className="text-[10px] text-amber-400">Your card:</span>
+            <div className="p-2 bg-amber-900/30 rounded-lg mb-2 flex-shrink-0 border border-amber-400/50">
+              <div className="flex justify-center items-center gap-3">
+                <span className="text-xs text-amber-400">Your card:</span>
                 <Card
                   card={currentPlayerData.card}
                   small
                   highlight={currentPlayerData.card?.value === communalCard?.value}
                 />
                 {currentPlayerData.card?.value === communalCard?.value && (
-                  <span className="text-yellow-400 text-[10px] font-bold">PAIRS!</span>
+                  <span className="text-yellow-400 text-xs font-bold">PAIRS!</span>
                 )}
               </div>
             </div>
 
             {/* Game Board - Board card + all player cards */}
-            <div className="p-1.5 bg-gray-900/60 rounded-lg flex-shrink-0">
-              <div className="flex justify-center items-end gap-2">
+            <div className="p-2 bg-gray-900/60 rounded-lg flex-shrink-0">
+              <div className="flex justify-center items-end gap-3">
                 {/* Board Card */}
                 <div className="text-center">
-                  <div className="text-[10px] text-emerald-400 font-bold">Board</div>
+                  <div className="text-xs text-emerald-400 font-bold">Board</div>
                   <Card card={communalCard} small highlight={boardHighest} />
                   {boardHighest && (
-                    <div className="text-purple-400 text-[10px]">HIGH</div>
+                    <div className="text-purple-400 text-xs">HIGH</div>
                   )}
                 </div>
 
@@ -1250,9 +1250,9 @@ export default function Kicker() {
                   if (p.eliminated) {
                     return (
                       <div key={idx} className="text-center opacity-30">
-                        <div className="text-[10px] text-gray-500 truncate max-w-[40px]">{p.name}</div>
-                        <div className="w-8 h-11 rounded bg-gray-800 flex items-center justify-center">
-                          <span className="text-red-400 text-[8px] font-bold">OUT</span>
+                        <div className="text-xs text-gray-500 truncate max-w-[50px]">{p.name}</div>
+                        <div className="w-11 h-16 rounded-lg bg-gray-800 flex items-center justify-center">
+                          <span className="text-red-400 text-xs font-bold">OUT</span>
                         </div>
                       </div>
                     );
@@ -1262,12 +1262,12 @@ export default function Kicker() {
 
                   return (
                     <div key={idx} className={`text-center ${p.folded ? 'opacity-40' : ''}`}>
-                      <div className={`text-[10px] truncate max-w-[40px] ${isCurrentTurn ? 'text-amber-400 font-bold' : 'text-gray-400'}`}>
+                      <div className={`text-xs truncate max-w-[50px] ${isCurrentTurn ? 'text-amber-400 font-bold' : 'text-gray-400'}`}>
                         {p.name}
                         {idx === dealer && ' D'}
                         {p.folded && ' X'}
                       </div>
-                      <div className={`inline-block ${p.revealed ? 'ring-1 ring-cyan-400 rounded' : ''}`}>
+                      <div className={`inline-block ${p.revealed ? 'ring-2 ring-cyan-400 rounded-lg' : ''}`}>
                         <Card
                           card={p.card}
                           small
@@ -1276,7 +1276,7 @@ export default function Kicker() {
                         />
                       </div>
                       {p.revealed && pairsBoard && (
-                        <div className="text-yellow-400 text-[10px]">PAIRS!</div>
+                        <div className="text-yellow-400 text-xs">PAIRS!</div>
                       )}
                     </div>
                   );
