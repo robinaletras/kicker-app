@@ -152,9 +152,10 @@ interface WinnerScreenProps {
   boardCard: CardType | null;
   onNextRound: () => void;
   rollover: boolean;
+  onReplay?: () => void;
 }
 
-const WinnerScreen = ({ winner, pot, players, boardCard, onNextRound, rollover }: WinnerScreenProps) => (
+const WinnerScreen = ({ winner, pot, players, boardCard, onNextRound, rollover, onReplay }: WinnerScreenProps) => (
   <div className="fixed inset-0 bg-gray-900/95 flex flex-col items-center justify-center z-50">
     <div className="text-center p-4 max-w-md">
       {rollover ? (
@@ -213,12 +214,22 @@ const WinnerScreen = ({ winner, pot, players, boardCard, onNextRound, rollover }
         })}
       </div>
 
-      <button
-        onClick={onNextRound}
-        className="px-8 py-3 bg-gradient-to-r from-amber-500 to-yellow-400 text-gray-900 rounded-xl font-bold text-base shadow-lg hover:from-amber-400 hover:to-yellow-300 transition-all"
-      >
-        Next Round
-      </button>
+      <div className="flex flex-col gap-2">
+        <button
+          onClick={onNextRound}
+          className="px-8 py-3 bg-gradient-to-r from-amber-500 to-yellow-400 text-gray-900 rounded-xl font-bold text-base shadow-lg hover:from-amber-400 hover:to-yellow-300 transition-all"
+        >
+          Next Round
+        </button>
+        {onReplay && (
+          <button
+            onClick={onReplay}
+            className="px-8 py-2 bg-gradient-to-r from-cyan-600 to-cyan-500 text-white rounded-xl font-bold text-sm shadow-lg hover:from-cyan-500 hover:to-cyan-400 transition-all"
+          >
+            Replay Last Round
+          </button>
+        )}
+      </div>
     </div>
   </div>
 );
@@ -256,6 +267,15 @@ export default function Kicker() {
   const [bettingRoundStarter, setBettingRoundStarter] = useState(0);
   const [dealer, setDealer] = useState(0);
   const [revealOrder, setRevealOrder] = useState<number[]>([]);
+  const [isReplaying, setIsReplaying] = useState(false);
+  const [roundStartState, setRoundStartState] = useState<{
+    players: Player[];
+    pot: number;
+    currentPlayer: number;
+    deck: CardType[];
+    communalCard: CardType;
+    revealOrder: number[];
+  } | null>(null);
 
   const AI_NAMES = [
     'Alex', 'Sam', 'Jordan', 'Taylor', 'Casey',
@@ -335,10 +355,22 @@ export default function Kicker() {
       attempts++;
     }
 
+    const initialPot = playingCount + rolloverPot;
+
+    // Save initial state for replay feature
+    setRoundStartState({
+      players: antePlayers.map(p => ({ ...p })),
+      pot: initialPot,
+      currentPlayer: firstToAct,
+      deck: [...newDeck],
+      communalCard: communal,
+      revealOrder: order,
+    });
+
     setDeck(newDeck);
     setCommunalCard(communal);
     setPlayers(antePlayers);
-    setPot(playingCount + rolloverPot);
+    setPot(initialPot);
     setSidePots([]);
     setAiRaiseCount({});
     setCurrentPlayer(firstToAct);
@@ -351,6 +383,7 @@ export default function Kicker() {
     setIsRollover(false);
     setLastRaiser(-1);
     setBettingRoundStarter(firstToAct);
+    setIsReplaying(false);
   };
 
   const handleReady = () => {
@@ -359,6 +392,17 @@ export default function Kicker() {
   };
 
   const getActivePlayers = () => players.filter(p => !p.folded && !p.eliminated);
+
+  // Check if all human players have folded (only AIs remain active)
+  const checkAllHumansFolded = (playersToCheck?: Player[]): boolean => {
+    const playerList = playersToCheck || players;
+    const activePlayers = playerList.filter(p => !p.folded && !p.eliminated);
+    const activeHumans = activePlayers.filter(p => !p.aiLevel);
+    const activeAIs = activePlayers.filter(p => p.aiLevel);
+
+    // All humans folded and at least 2 AIs remain to play
+    return activeHumans.length === 0 && activeAIs.length >= 2;
+  };
 
   const findNextActivePlayer = (fromIndex: number, playersToCheck?: Player[]) => {
     const playerList = playersToCheck || players;
@@ -463,6 +507,225 @@ export default function Kicker() {
     }
 
     // Default fallback
+    if (canCheck) return { action: 'check' };
+    return { action: 'call' };
+  };
+
+  // Simulate the rest of the round instantly (for when all humans fold)
+  const simulateRestOfRound = (
+    simPlayers: Player[],
+    simPot: number,
+    simCurrentPlayer: number,
+    simCurrentBet: number,
+    simRevealPhase: number,
+    simLastRaiser: number,
+    simBettingStarter: number,
+    simRevealOrder: number[],
+    simAiRaiseCount: Record<number, number>
+  ): { finalPlayers: Player[]; finalPot: number } => {
+    let sPlayers = simPlayers.map(p => ({ ...p }));
+    let sPot = simPot;
+    let sCurrentPlayer = simCurrentPlayer;
+    let sCurrentBet = simCurrentBet;
+    let sRevealPhase = simRevealPhase;
+    let sLastRaiser = simLastRaiser;
+    let sBettingStarter = simBettingStarter;
+    let sAiRaiseCount = { ...simAiRaiseCount };
+
+    const MAX_ITERATIONS = 200; // Safety limit
+    let iterations = 0;
+
+    while (iterations < MAX_ITERATIONS) {
+      iterations++;
+
+      const activePlayers = sPlayers.filter(p => !p.folded && !p.eliminated);
+      const playersWhoCanAct = sPlayers.filter(p => !p.folded && !p.eliminated && !p.allIn);
+
+      // End conditions
+      if (activePlayers.length <= 1) break;
+      if (playersWhoCanAct.length === 0) break;
+
+      // Find next player who can act
+      let nextPlayer = (sCurrentPlayer + 1) % 4;
+      let attempts = 0;
+      while ((sPlayers[nextPlayer].folded || sPlayers[nextPlayer].eliminated || sPlayers[nextPlayer].allIn) && attempts < 4) {
+        nextPlayer = (nextPlayer + 1) % 4;
+        attempts++;
+      }
+      if (attempts >= 4) break;
+
+      // Check if betting round is complete
+      const checkPlayer = sLastRaiser >= 0 ? sLastRaiser : sBettingStarter;
+      const allMatched = activePlayers.every(p => p.currentBet === sCurrentBet || p.folded);
+
+      const roundComplete = (nextPlayer === checkPlayer && allMatched && sCurrentBet > 0) ||
+                           (nextPlayer === checkPlayer && sCurrentBet === 0 && sCurrentPlayer !== -1);
+
+      if (roundComplete || (playersWhoCanAct.length === 1 && allMatched)) {
+        // Reveal next card
+        let revealerIndex = -1;
+        for (let i = 0; i < simRevealOrder.length; i++) {
+          const idx = simRevealOrder[i];
+          if (!sPlayers[idx].revealed && !sPlayers[idx].eliminated) {
+            revealerIndex = idx;
+            break;
+          }
+        }
+
+        if (revealerIndex === -1) {
+          // All revealed, done
+          break;
+        }
+
+        sPlayers[revealerIndex].revealed = true;
+        sRevealPhase++;
+        sCurrentBet = 0;
+        sLastRaiser = -1;
+        sAiRaiseCount = {};
+        sPlayers = sPlayers.map(p => ({ ...p, currentBet: 0 }));
+
+        // Find new betting starter
+        let starter = 0;
+        while (starter < 4 && sPlayers[starter].folded) starter++;
+        sBettingStarter = starter;
+        sCurrentPlayer = starter - 1; // Will be incremented
+        continue;
+      }
+
+      sCurrentPlayer = nextPlayer;
+      const player = sPlayers[sCurrentPlayer];
+
+      // Make AI decision
+      const toCall = sCurrentBet - player.currentBet;
+      const canCheck = sCurrentBet === 0;
+      const aiRaises = sAiRaiseCount[sCurrentPlayer] || 0;
+      const canRaise = aiRaises < 2;
+      const decision = makeAIDecisionPure(player, sCurrentPlayer, sCurrentBet, canRaise, communalCard!, sPlayers);
+
+      // Apply decision
+      if (decision.action === 'fold') {
+        sPlayers[sCurrentPlayer] = { ...player, folded: true };
+      } else if (decision.action === 'check') {
+        // Nothing changes
+      } else if (decision.action === 'call') {
+        const actualCall = Math.min(toCall, player.chips);
+        sPlayers[sCurrentPlayer] = {
+          ...player,
+          chips: player.chips - actualCall,
+          currentBet: player.currentBet + actualCall,
+          totalRoundBet: player.totalRoundBet + actualCall,
+          allIn: player.chips - actualCall <= 0
+        };
+        sPot += actualCall;
+      } else if (decision.action === 'bet' && decision.amount) {
+        const actualBet = Math.min(decision.amount, player.chips);
+        sPlayers[sCurrentPlayer] = {
+          ...player,
+          chips: player.chips - actualBet,
+          currentBet: player.currentBet + actualBet,
+          totalRoundBet: player.totalRoundBet + actualBet,
+          allIn: player.chips - actualBet <= 0
+        };
+        sPot += actualBet;
+        sCurrentBet = actualBet;
+        sLastRaiser = sCurrentPlayer;
+        sAiRaiseCount[sCurrentPlayer] = (sAiRaiseCount[sCurrentPlayer] || 0) + 1;
+      } else if (decision.action === 'raise' && decision.amount) {
+        const totalCost = toCall + decision.amount;
+        const actualCost = Math.min(totalCost, player.chips);
+        sPlayers[sCurrentPlayer] = {
+          ...player,
+          chips: player.chips - actualCost,
+          currentBet: sCurrentBet + decision.amount,
+          totalRoundBet: player.totalRoundBet + actualCost,
+          allIn: player.chips - actualCost <= 0
+        };
+        sPot += actualCost;
+        sCurrentBet = sCurrentBet + decision.amount;
+        sLastRaiser = sCurrentPlayer;
+        sAiRaiseCount[sCurrentPlayer] = (sAiRaiseCount[sCurrentPlayer] || 0) + 1;
+      }
+    }
+
+    // Reveal all remaining cards
+    sPlayers = sPlayers.map(p => ({ ...p, revealed: true }));
+
+    return { finalPlayers: sPlayers, finalPot: sPot };
+  };
+
+  // Pure version of AI decision (doesn't use React state)
+  const makeAIDecisionPure = (
+    player: Player,
+    playerIndex: number,
+    currentBet: number,
+    canRaiseMore: boolean,
+    boardCard: CardType,
+    allPlayers: Player[]
+  ): { action: Action; amount?: number } => {
+    const myCard = player.card!;
+    const aiLevel = player.aiLevel!;
+    const toCall = currentBet - player.currentBet;
+    const canCheck = currentBet === 0;
+    const availableChips = player.chips;
+    const canAffordCall = availableChips >= toCall;
+    const maxBet = availableChips;
+    const maxRaise = availableChips - toCall;
+
+    const revealedHigherCards = allPlayers.filter(
+      p => p.revealed && !p.folded && !p.eliminated && p.card && p.card.value > myCard.value
+    );
+    const boardHigher = boardCard.value > myCard.value;
+    const pairsWithBoard = boardCard.value === myCard.value;
+
+    if (!canAffordCall && toCall > 0) {
+      if (pairsWithBoard || aiLevel === 'aggressive') return { action: 'call' };
+      return { action: 'fold' };
+    }
+
+    if (aiLevel === 'cautious') {
+      if (revealedHigherCards.length > 0 || boardHigher) {
+        if (canCheck) return { action: 'check' };
+        return { action: 'fold' };
+      }
+      if (canCheck) return { action: 'check' };
+      if (toCall > 0) return { action: 'call' };
+      const betAmount = Math.min(1, maxBet);
+      if (betAmount > 0) return { action: 'bet', amount: betAmount };
+      return { action: 'check' };
+    }
+
+    if (aiLevel === 'random') {
+      if (!pairsWithBoard && toCall > 0 && Math.random() < 0.3) return { action: 'fold' };
+      if (canRaiseMore && Math.random() < 0.2) {
+        const amount = Math.min(Math.floor(Math.random() * 3) + 1, canCheck ? maxBet : maxRaise);
+        if (amount > 0) {
+          if (canCheck) return { action: 'bet', amount };
+          return { action: 'raise', amount };
+        }
+      }
+      if (canCheck) return { action: 'check' };
+      return { action: 'call' };
+    }
+
+    if (aiLevel === 'aggressive') {
+      if (canRaiseMore && pairsWithBoard) {
+        const amount = Math.min(3, canCheck ? maxBet : maxRaise);
+        if (amount > 0) {
+          if (canCheck) return { action: 'bet', amount };
+          return { action: 'raise', amount };
+        }
+      }
+      if (canRaiseMore && Math.random() < 0.5) {
+        const amount = Math.min(Math.floor(Math.random() * 2) + 1, canCheck ? maxBet : maxRaise);
+        if (amount > 0) {
+          if (canCheck) return { action: 'bet', amount };
+          return { action: 'raise', amount };
+        }
+      }
+      if (canCheck) return { action: 'check' };
+      return { action: 'call' };
+    }
+
     if (canCheck) return { action: 'check' };
     return { action: 'call' };
   };
@@ -911,6 +1174,58 @@ export default function Kicker() {
       return;
     }
 
+    // Check if all humans have folded - simulate rest and end round immediately
+    const allHumansFolded = checkAllHumansFolded(playersToUse);
+    if (allHumansFolded && !isReplaying) {
+      // Simulate the rest of the round to get correct final money
+      const { finalPlayers, finalPot } = simulateRestOfRound(
+        playersToUse,
+        potToUse,
+        currentPlayer,
+        currentBetToUse,
+        revealPhase,
+        lastRaiserToUse,
+        bettingRoundStarter,
+        revealOrder,
+        aiRaiseCount
+      );
+
+      // End round with simulated results
+      endRound(finalPot, finalPlayers);
+      return;
+    }
+
+    // If only one player can act, skip betting and go straight to reveal/end
+    if (playersWhoCanAct.length === 1) {
+      // Find next card to reveal
+      let revealerIndex = -1;
+      for (let i = 0; i < revealOrder.length; i++) {
+        const idx = revealOrder[i];
+        if (!playersToUse[idx].revealed && !playersToUse[idx].eliminated) {
+          revealerIndex = idx;
+          break;
+        }
+      }
+
+      if (revealerIndex === -1) {
+        // All cards revealed, end the round
+        endRound(potToUse, playersToUse);
+        return;
+      }
+
+      // Reveal the next card and start new betting round
+      const nextReveal = revealPhase + 1;
+      const revealedPlayers = playersToUse.map((p, i) =>
+        i === revealerIndex ? { ...p, revealed: true } : p
+      );
+      const revealer = revealedPlayers[revealerIndex];
+      const foldedNote = revealer.folded ? ' (folded)' : '';
+      setMessage(`${revealer.name} reveals: ${revealer.card!.rank}${revealer.card!.suit}${foldedNote}`);
+      setPot(potToUse);
+      startNextBettingRound(revealedPlayers, nextReveal);
+      return;
+    }
+
     const nextPlayer = findNextActivePlayer(currentPlayer, playersToUse);
 
     if (nextPlayer === -1) {
@@ -918,7 +1233,13 @@ export default function Kicker() {
       return;
     }
 
-    const checkPlayer = lastRaiserToUse >= 0 ? lastRaiserToUse : bettingRoundStarter;
+    // Determine who we're waiting to get back to for the round to end
+    // If the original check player (raiser or starter) has folded, find the next active player from that position
+    let checkPlayer = lastRaiserToUse >= 0 ? lastRaiserToUse : bettingRoundStarter;
+    if (playersToUse[checkPlayer].folded || playersToUse[checkPlayer].eliminated) {
+      checkPlayer = findNextActivePlayer(checkPlayer - 1, playersToUse); // -1 because findNext starts at +1
+      if (checkPlayer === -1) checkPlayer = bettingRoundStarter; // fallback
+    }
     const allMatched = activePlayers.every(p => p.currentBet === currentBetToUse || p.folded);
 
     if (nextPlayer === checkPlayer && allMatched && currentBetToUse > 0) {
@@ -948,7 +1269,7 @@ export default function Kicker() {
       setMessage(`${revealer.name} reveals: ${revealer.card!.rank}${revealer.card!.suit}${foldedNote}`);
       setPot(potToUse);
       startNextBettingRound(revealedPlayers, nextReveal);
-    } else if (nextPlayer === bettingRoundStarter && currentBetToUse === 0) {
+    } else if (nextPlayer === checkPlayer && currentBetToUse === 0) {
       const nextReveal = revealPhase + 1;
 
       let revealerIndex = -1;
@@ -1114,6 +1435,49 @@ export default function Kicker() {
     setPot(0);
     setCurrentBetAmount(0);
     setIsRollover(false);
+    setIsReplaying(false);
+  };
+
+  // Handle "Replay Last Round" - restore initial state and watch round play out
+  const handleReplayLastRound = () => {
+    if (!roundStartState) return;
+
+    // Restore the initial round state
+    setPlayers(roundStartState.players.map(p => ({ ...p })));
+    setPot(roundStartState.pot);
+    setCurrentPlayer(roundStartState.currentPlayer);
+    setDeck([...roundStartState.deck]);
+    setCommunalCard(roundStartState.communalCard);
+    setRevealOrder(roundStartState.revealOrder);
+    setCurrentBetAmount(0);
+    setRevealPhase(0);
+    setLastRaiser(-1);
+    setAiRaiseCount({});
+
+    // Clear winner and start replaying
+    setWinner(null);
+    setIsReplaying(true);
+    setShowPassScreen(true);
+    setGameState('passing');
+  };
+
+  // Cancel replay - simulate to end and show winner
+  const handleCancelReplay = () => {
+    // Simulate the rest of the round to get final result
+    const { finalPlayers, finalPot } = simulateRestOfRound(
+      players,
+      pot,
+      currentPlayer,
+      currentBetAmount,
+      revealPhase,
+      lastRaiser,
+      bettingRoundStarter,
+      revealOrder,
+      aiRaiseCount
+    );
+
+    setIsReplaying(false);
+    endRound(finalPot, finalPlayers);
   };
 
   const currentPlayerData = players[currentPlayer];
@@ -1210,6 +1574,11 @@ export default function Kicker() {
           // AI player pass screen
           <div className="fixed inset-0 bg-gray-900 flex flex-col items-center justify-center z-50">
             <div className="text-center p-4">
+              {isReplaying && (
+                <div className="text-cyan-300 text-xs mb-2 px-3 py-1 bg-cyan-900/60 rounded-full inline-block">
+                  Replaying round...
+                </div>
+              )}
               <h2 className="font-display text-2xl text-cyan-400 mb-2">{players[currentPlayer].name}'s Turn</h2>
               <p className="text-gray-400 mb-1 text-sm">({players[currentPlayer].aiLevel} AI)</p>
               {autoAI ? (
@@ -1220,6 +1589,14 @@ export default function Kicker() {
                   className="mt-4 px-8 py-3 bg-gradient-to-r from-cyan-600 to-cyan-500 text-white rounded-xl font-bold text-base shadow-lg hover:from-cyan-500 hover:to-cyan-400 transition-all"
                 >
                   Next
+                </button>
+              )}
+              {isReplaying && (
+                <button
+                  onClick={handleCancelReplay}
+                  className="mt-4 ml-2 px-6 py-2 bg-red-600 hover:bg-red-500 text-white rounded-xl font-bold text-sm transition-colors"
+                >
+                  Stop Replay
                 </button>
               )}
             </div>
@@ -1237,6 +1614,7 @@ export default function Kicker() {
           boardCard={communalCard}
           onNextRound={handleNextRound}
           rollover={isRollover}
+          onReplay={roundStartState ? handleReplayLastRound : undefined}
         />
       )}
 
@@ -1412,6 +1790,19 @@ export default function Kicker() {
 
         {gameState === 'playing' && (
           <div className="flex-1 flex flex-col overflow-hidden">
+            {/* Replaying Banner */}
+            {isReplaying && (
+              <div className="flex justify-between items-center mb-2 px-4 py-2 bg-cyan-900/60 rounded-lg border border-cyan-500 flex-shrink-0">
+                <div className="text-cyan-300 text-sm font-medium">Replaying round...</div>
+                <button
+                  onClick={handleCancelReplay}
+                  className="px-4 py-1 bg-red-600 hover:bg-red-500 text-white rounded-lg font-bold text-sm transition-colors"
+                >
+                  Stop Replay
+                </button>
+              </div>
+            )}
+
             {/* Game Info */}
             <div className="flex justify-between items-center mb-2 px-4 py-2 bg-gray-900/80 rounded-lg border border-emerald-800 flex-shrink-0">
               <div className="text-center">
