@@ -268,11 +268,20 @@ export default function Kicker() {
   const [dealer, setDealer] = useState(0);
   const [revealOrder, setRevealOrder] = useState<number[]>([]);
   const [isReplaying, setIsReplaying] = useState(false);
+  const [replayIndex, setReplayIndex] = useState(0);
+  const [roundHistory, setRoundHistory] = useState<{
+    action: Action;
+    playerIndex: number;
+    amount?: number;
+    message: string;
+    playersAfter: Player[];
+    potAfter: number;
+    revealedCard?: { playerIndex: number };
+  }[]>([]);
   const [roundStartState, setRoundStartState] = useState<{
     players: Player[];
     pot: number;
     currentPlayer: number;
-    deck: CardType[];
     communalCard: CardType;
     revealOrder: number[];
   } | null>(null);
@@ -362,7 +371,6 @@ export default function Kicker() {
       players: antePlayers.map(p => ({ ...p })),
       pot: initialPot,
       currentPlayer: firstToAct,
-      deck: [...newDeck],
       communalCard: communal,
       revealOrder: order,
     });
@@ -384,6 +392,8 @@ export default function Kicker() {
     setLastRaiser(-1);
     setBettingRoundStarter(firstToAct);
     setIsReplaying(false);
+    setReplayIndex(0);
+    setRoundHistory([]);
   };
 
   const handleReady = () => {
@@ -1219,7 +1229,12 @@ export default function Kicker() {
       );
       const revealer = revealedPlayers[revealerIndex];
       const foldedNote = revealer.folded ? ' (folded)' : '';
-      setMessage(`${revealer.name} reveals: ${revealer.card!.rank}${revealer.card!.suit}${foldedNote}`);
+      const revealMsg = `${revealer.name} reveals: ${revealer.card!.rank}${revealer.card!.suit}${foldedNote}`;
+      setMessage(revealMsg);
+      // Record reveal (not during replay)
+      if (!isReplaying) {
+        setRoundHistory(prev => [...prev, { action: 'check' as Action, playerIndex: revealerIndex, message: revealMsg, playersAfter: revealedPlayers.map(p => ({...p})), potAfter: potToUse, revealedCard: { playerIndex: revealerIndex } }]);
+      }
       setPot(potToUse);
       startNextBettingRound(revealedPlayers, nextReveal);
       return;
@@ -1265,7 +1280,11 @@ export default function Kicker() {
       );
       const revealer = revealedPlayers[revealerIndex];
       const foldedNote = revealer.folded ? ' (folded)' : '';
-      setMessage(`${revealer.name} reveals: ${revealer.card!.rank}${revealer.card!.suit}${foldedNote}`);
+      const revealMsg = `${revealer.name} reveals: ${revealer.card!.rank}${revealer.card!.suit}${foldedNote}`;
+      setMessage(revealMsg);
+      if (!isReplaying) {
+        setRoundHistory(prev => [...prev, { action: 'check' as Action, playerIndex: revealerIndex, message: revealMsg, playersAfter: revealedPlayers.map(p => ({...p})), potAfter: potToUse, revealedCard: { playerIndex: revealerIndex } }]);
+      }
       setPot(potToUse);
       startNextBettingRound(revealedPlayers, nextReveal);
     } else if (nextPlayer === checkPlayer && currentBetToUse === 0) {
@@ -1274,7 +1293,6 @@ export default function Kicker() {
       let revealerIndex = -1;
       for (let i = 0; i < revealOrder.length; i++) {
         const idx = revealOrder[i];
-        // Reveal ALL cards (including folded players) - they're part of the hand
         if (!playersToUse[idx].revealed && !playersToUse[idx].eliminated) {
           revealerIndex = idx;
           break;
@@ -1282,7 +1300,6 @@ export default function Kicker() {
       }
 
       if (revealerIndex === -1) {
-        // All cards revealed, end the round
         endRound(potToUse, playersToUse);
         return;
       }
@@ -1292,7 +1309,11 @@ export default function Kicker() {
       );
       const revealer = revealedPlayers[revealerIndex];
       const foldedNote = revealer.folded ? ' (folded)' : '';
-      setMessage(`${revealer.name} reveals: ${revealer.card!.rank}${revealer.card!.suit}${foldedNote}`);
+      const revealMsg2 = `${revealer.name} reveals: ${revealer.card!.rank}${revealer.card!.suit}${foldedNote}`;
+      setMessage(revealMsg2);
+      if (!isReplaying) {
+        setRoundHistory(prev => [...prev, { action: 'check' as Action, playerIndex: revealerIndex, message: revealMsg2, playersAfter: revealedPlayers.map(p => ({...p})), potAfter: potToUse, revealedCard: { playerIndex: revealerIndex } }]);
+      }
       setPot(potToUse);
       startNextBettingRound(revealedPlayers, nextReveal);
     } else {
@@ -1312,6 +1333,7 @@ export default function Kicker() {
     const toCall = Math.min(currentBetAmount - player.currentBet, player.chips);
     // Always create a fresh copy to preserve all state including revealed
     let newPlayers = players.map(p => ({ ...p }));
+    let actionMessage = '';
 
     // Helper to update player with all-in detection
     const updatePlayer = (p: Player, i: number, chipCost: number, newBet: number): Player => {
@@ -1336,30 +1358,36 @@ export default function Kicker() {
       newPot = pot + actualBet;
       setCurrentBetAmount(actualBet);
       setLastRaiser(currentPlayer);
-      // Track AI raises (bet counts as first raise)
       if (player.aiLevel) {
         setAiRaiseCount(prev => ({ ...prev, [currentPlayer]: (prev[currentPlayer] || 0) + 1 }));
       }
-      setMessage(`${player.name} ${isAllIn ? 'went all-in with' : 'bet'} $${actualBet}`);
+      actionMessage = `${player.name} ${isAllIn ? 'went all-in with' : 'bet'} $${actualBet}`;
+      setMessage(actionMessage);
+      // Record action (not during replay)
+      if (!isReplaying) {
+        setRoundHistory(prev => [...prev, { action, playerIndex: currentPlayer, amount: actualBet, message: actionMessage, playersAfter: newPlayers.map(p => ({...p})), potAfter: newPot }]);
+      }
       advanceToNextPlayer(newPlayers, newPot, currentPlayer, actualBet);
       return;
     } else if (action === 'call') {
-      // Limit call to available chips (all-in if can't afford full call)
       const actualCall = Math.min(toCall, player.chips);
       const isAllIn = actualCall >= player.chips;
       newPlayers = newPlayers.map((p, i) => updatePlayer(p, i, actualCall, p.currentBet + actualCall));
       newPot = pot + actualCall;
-      setMessage(`${player.name} ${isAllIn ? 'went all-in with' : 'called'} $${actualCall}`);
+      actionMessage = `${player.name} ${isAllIn ? 'went all-in with' : 'called'} $${actualCall}`;
+      setMessage(actionMessage);
     } else if (action === 'raise') {
-      // Limit raise to available chips
       const maxRaise = player.chips - toCall;
       const actualRaise = Math.min(amount, maxRaise);
       if (actualRaise <= 0) {
-        // Can't raise, just call (all-in)
         const actualCall = Math.min(toCall, player.chips);
         newPlayers = newPlayers.map((p, i) => updatePlayer(p, i, actualCall, p.currentBet + actualCall));
         newPot = pot + actualCall;
-        setMessage(`${player.name} went all-in with $${actualCall}`);
+        actionMessage = `${player.name} went all-in with $${actualCall}`;
+        setMessage(actionMessage);
+        if (!isReplaying) {
+          setRoundHistory(prev => [...prev, { action: 'call', playerIndex: currentPlayer, amount: actualCall, message: actionMessage, playersAfter: newPlayers.map(p => ({...p})), potAfter: newPot }]);
+        }
         advanceToNextPlayer(newPlayers, newPot);
         return;
       }
@@ -1370,20 +1398,25 @@ export default function Kicker() {
       newPot = pot + totalCost;
       setCurrentBetAmount(newBetAmount);
       setLastRaiser(currentPlayer);
-      // Track AI raises
       if (player.aiLevel) {
         setAiRaiseCount(prev => ({ ...prev, [currentPlayer]: (prev[currentPlayer] || 0) + 1 }));
       }
-      setMessage(`${player.name} ${isAllIn ? 'went all-in, raising to' : 'raised to'} $${newBetAmount}`);
+      actionMessage = `${player.name} ${isAllIn ? 'went all-in, raising to' : 'raised to'} $${newBetAmount}`;
+      setMessage(actionMessage);
+      if (!isReplaying) {
+        setRoundHistory(prev => [...prev, { action, playerIndex: currentPlayer, amount: actualRaise, message: actionMessage, playersAfter: newPlayers.map(p => ({...p})), potAfter: newPot }]);
+      }
       advanceToNextPlayer(newPlayers, newPot, currentPlayer, newBetAmount);
       return;
     } else if (action === 'check') {
-      setMessage(`${player.name} checked`);
+      actionMessage = `${player.name} checked`;
+      setMessage(actionMessage);
     } else if (action === 'fold') {
       newPlayers = newPlayers.map((p, i) =>
         i === currentPlayer ? { ...p, folded: true } : p
       );
-      setMessage(`${player.name} folded`);
+      actionMessage = `${player.name} folded`;
+      setMessage(actionMessage);
     } else if (action === 'peek') {
       if (deck.length > 0) {
         const newDeck = [...deck];
@@ -1398,6 +1431,11 @@ export default function Kicker() {
         setMessage(`${player.name} peeked at a card`);
         return;
       }
+    }
+
+    // Record action (not during replay)
+    if (!isReplaying && actionMessage) {
+      setRoundHistory(prev => [...prev, { action, playerIndex: currentPlayer, amount, message: actionMessage, playersAfter: newPlayers.map(p => ({...p})), potAfter: newPot }]);
     }
 
     advanceToNextPlayer(newPlayers, newPot);
@@ -1437,46 +1475,52 @@ export default function Kicker() {
     setIsReplaying(false);
   };
 
-  // Handle "Replay Last Round" - restore initial state and watch round play out
+  // Handle "Replay Last Round" - step through recorded history
   const handleReplayLastRound = () => {
-    if (!roundStartState) return;
+    if (!roundStartState || roundHistory.length === 0) return;
 
     // Restore the initial round state
     setPlayers(roundStartState.players.map(p => ({ ...p })));
     setPot(roundStartState.pot);
     setCurrentPlayer(roundStartState.currentPlayer);
-    setDeck([...roundStartState.deck]);
     setCommunalCard(roundStartState.communalCard);
     setRevealOrder(roundStartState.revealOrder);
-    setCurrentBetAmount(0);
-    setRevealPhase(0);
-    setLastRaiser(-1);
-    setAiRaiseCount({});
+    setMessage('Replaying round...');
 
     // Clear winner and start replaying
     setWinner(null);
     setIsReplaying(true);
-    setShowPassScreen(true);
-    setGameState('passing');
+    setReplayIndex(0);
+    setGameState('playing');
   };
 
-  // Cancel replay - simulate to end and show winner
-  const handleCancelReplay = () => {
-    // Simulate the rest of the round to get final result
-    const { finalPlayers, finalPot } = simulateRestOfRound(
-      players,
-      pot,
-      currentPlayer,
-      currentBetAmount,
-      revealPhase,
-      lastRaiser,
-      bettingRoundStarter,
-      revealOrder,
-      aiRaiseCount
-    );
+  // Advance to next step in replay
+  const advanceReplay = () => {
+    if (replayIndex >= roundHistory.length) {
+      // Replay finished - show winner
+      setIsReplaying(false);
+      const lastEntry = roundHistory[roundHistory.length - 1];
+      endRound(lastEntry.potAfter, lastEntry.playersAfter);
+      return;
+    }
 
+    const entry = roundHistory[replayIndex];
+    setPlayers(entry.playersAfter.map(p => ({ ...p })));
+    setPot(entry.potAfter);
+    setCurrentPlayer(entry.playerIndex);
+    setMessage(entry.message);
+    setReplayIndex(prev => prev + 1);
+  };
+
+  // Cancel replay - jump to end
+  const handleCancelReplay = () => {
+    if (roundHistory.length === 0) {
+      setIsReplaying(false);
+      return;
+    }
+    const lastEntry = roundHistory[roundHistory.length - 1];
     setIsReplaying(false);
-    endRound(finalPot, finalPlayers);
+    endRound(lastEntry.potAfter, lastEntry.playersAfter);
   };
 
   const currentPlayerData = players[currentPlayer];
@@ -1559,6 +1603,18 @@ export default function Kicker() {
   useEffect(() => {
     setAiPendingAction(null);
   }, [currentPlayer]);
+
+  // Auto-advance replay at current AI speed
+  useEffect(() => {
+    if (!isReplaying || replayIndex >= roundHistory.length) return;
+
+    const delay = 1000 * aiSpeed; // Use AI speed setting
+    const timer = setTimeout(() => {
+      advanceReplay();
+    }, delay);
+
+    return () => clearTimeout(timer);
+  }, [isReplaying, replayIndex, aiSpeed, roundHistory.length]);
 
   return (
     <div className="h-dvh bg-gradient-to-br from-gray-900 via-emerald-950 to-gray-900 text-white p-2 font-sans overflow-hidden flex flex-col">
