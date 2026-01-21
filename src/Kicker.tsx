@@ -597,7 +597,6 @@ export default function Kicker() {
 
       // Make AI decision
       const toCall = sCurrentBet - player.currentBet;
-      const canCheck = sCurrentBet === 0;
       const aiRaises = sAiRaiseCount[sCurrentPlayer] || 0;
       const canRaise = aiRaises < 2;
       const decision = makeAIDecisionPure(player, sCurrentPlayer, sCurrentBet, canRaise, communalCard!, sPlayers);
@@ -656,7 +655,7 @@ export default function Kicker() {
   // Pure version of AI decision (doesn't use React state)
   const makeAIDecisionPure = (
     player: Player,
-    playerIndex: number,
+    _playerIndex: number,
     currentBet: number,
     canRaiseMore: boolean,
     boardCard: CardType,
