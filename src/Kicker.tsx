@@ -398,56 +398,67 @@ export default function Kicker() {
 
     const boardValue = communalCard!.value;
 
-    const boardPairPlayers = activePlayers.filter(p => p.card!.value === boardValue);
+    // Collect ALL pairs - both board pairs and player pairs
+    const allPairs: { value: number; players: Player[]; isBoard: boolean }[] = [];
 
+    // Board pairs (player card matches board)
+    const boardPairPlayers = activePlayers.filter(p => p.card!.value === boardValue);
     if (boardPairPlayers.length > 0) {
-      if (boardPairPlayers.length === 1) {
-        return {
-          name: boardPairPlayers[0].name,
-          isSplit: false,
-          reason: `Paired with board (${communalCard!.rank})`,
-          rollover: false
-        };
-      } else {
-        return {
-          name: boardPairPlayers.map(p => p.name).join(' & '),
-          isSplit: true,
-          players: boardPairPlayers,
-          reason: `Both paired with board (${communalCard!.rank})`,
-          rollover: false
-        };
-      }
+      allPairs.push({
+        value: boardValue,
+        players: boardPairPlayers,
+        isBoard: true
+      });
     }
 
-    const pairs: { value: number; players: Player[] }[] = [];
-
+    // Player pairs (two players have matching cards)
     for (let i = 0; i < activePlayers.length; i++) {
       for (let j = i + 1; j < activePlayers.length; j++) {
         if (activePlayers[i].card!.value === activePlayers[j].card!.value) {
-          pairs.push({
+          allPairs.push({
             value: activePlayers[i].card!.value,
-            players: [activePlayers[i], activePlayers[j]]
+            players: [activePlayers[i], activePlayers[j]],
+            isBoard: false
           });
         }
       }
     }
 
-    if (pairs.length > 0) {
-      const highestPairValue = Math.max(...pairs.map(p => p.value));
-      const highestPairs = pairs.filter(p => p.value === highestPairValue);
+    // Find the highest pair value among all pairs
+    if (allPairs.length > 0) {
+      const highestPairValue = Math.max(...allPairs.map(p => p.value));
+      const highestPairs = allPairs.filter(p => p.value === highestPairValue);
 
+      // Get all players involved in the highest pairs
       const pairPlayers = highestPairs.flatMap(p => p.players);
       const uniquePairPlayers = [...new Map(pairPlayers.map(p => [p.name, p])).values()];
 
-      return {
-        name: uniquePairPlayers.map(p => p.name).join(' & '),
-        isSplit: true,
-        players: uniquePairPlayers,
-        reason: `Pair of ${uniquePairPlayers[0].card!.rank}s`,
-        rollover: false
-      };
+      // Check if the winning pair is a board pair
+      const winningIsBoard = highestPairs.some(p => p.isBoard);
+
+      if (uniquePairPlayers.length === 1) {
+        return {
+          name: uniquePairPlayers[0].name,
+          isSplit: false,
+          reason: winningIsBoard
+            ? `Paired with board (${communalCard!.rank})`
+            : `Pair of ${uniquePairPlayers[0].card!.rank}s`,
+          rollover: false
+        };
+      } else {
+        return {
+          name: uniquePairPlayers.map(p => p.name).join(' & '),
+          isSplit: true,
+          players: uniquePairPlayers,
+          reason: winningIsBoard
+            ? `Paired with board (${communalCard!.rank})`
+            : `Pair of ${uniquePairPlayers[0].card!.rank}s`,
+          rollover: false
+        };
+      }
     }
 
+    // No pairs - check high card
     const allCardValues = [boardValue, ...activePlayers.map(p => p.card!.value)];
     const highestValue = Math.max(...allCardValues);
 
