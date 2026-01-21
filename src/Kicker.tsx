@@ -416,6 +416,11 @@ export default function Kicker() {
     const playerList = playersToCheck || players;
     const activePlayers = playerList.filter(p => !p.folded && !p.eliminated);
 
+    // Debug logging
+    console.log('=== DETERMINE WINNER ===');
+    console.log('Board:', communalCard?.rank, communalCard?.suit, 'value:', communalCard?.value);
+    console.log('Active players:', activePlayers.map(p => `${p.name}: ${p.card?.rank}${p.card?.suit} (${p.card?.value})`));
+
     if (activePlayers.length === 1) {
       return {
         name: activePlayers[0].name,
@@ -438,6 +443,7 @@ export default function Kicker() {
         players: boardPairPlayers,
         isBoard: true
       });
+      console.log('Board pair found:', boardPairPlayers.map(p => p.name));
     }
 
     // Player pairs (two players have matching cards)
@@ -449,9 +455,12 @@ export default function Kicker() {
             players: [activePlayers[i], activePlayers[j]],
             isBoard: false
           });
+          console.log('Player pair found:', activePlayers[i].name, '&', activePlayers[j].name, 'value:', activePlayers[i].card!.value);
         }
       }
     }
+
+    console.log('Total pairs found:', allPairs.length);
 
     // Find the highest pair value among all pairs
     if (allPairs.length > 0) {
@@ -488,10 +497,13 @@ export default function Kicker() {
     }
 
     // No pairs - check high card
+    console.log('No pairs found, checking high card...');
     const allCardValues = [boardValue, ...activePlayers.map(p => p.card!.value)];
     const highestValue = Math.max(...allCardValues);
+    console.log('All card values:', allCardValues, 'highest:', highestValue);
 
     if (boardValue === highestValue) {
+      console.log('Board is highest - ROLLOVER');
       return {
         name: 'Board',
         isSplit: false,
