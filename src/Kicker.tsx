@@ -552,10 +552,12 @@ export default function Kicker() {
     };
 
     // Helper to determine winner - the player who MADE the hand wins
-    // Kicker only describes the hand, doesn't determine winner
+    // If multiple players made the hand, they SPLIT (shared kicker)
+    // If no kicker exists (all cards used), then ROLLOVER
     const resolveByHandMaker = (handDescription: string, usedValues: Set<number>, handMakers: Player[]): Winner => {
       const kickerDesc = getKickerDescription(usedValues);
-      console.log('resolveByHandMaker:', handDescription, 'handMakers:', handMakers.map(p => p.name));
+      const hasKicker = kickerDesc !== '';
+      console.log('resolveByHandMaker:', handDescription, 'handMakers:', handMakers.map(p => p.name), 'hasKicker:', hasKicker);
 
       if (handMakers.length === 1) {
         // One player made the hand - they win
@@ -567,16 +569,17 @@ export default function Kicker() {
           rollover: false
         };
       } else if (handMakers.length > 1) {
-        // Multiple players made the hand - tie, rollover
-        console.log('Tie - rollover');
+        // Multiple players made the hand - they SPLIT the pot
+        console.log('Split between:', handMakers.map(p => p.name));
         return {
-          name: 'Tie',
-          isSplit: false,
-          reason: `${handDescription}${kickerDesc} - Tie!`,
-          rollover: true
+          name: handMakers.map(p => p.name).join(' & '),
+          isSplit: true,
+          players: handMakers,
+          reason: `${handDescription}${kickerDesc}`,
+          rollover: false
         };
       }
-      // No players made the hand (shouldn't happen for most hands)
+      // No players made the hand - rollover
       console.log('No handMakers - Board rollover');
       return { name: 'Board', isSplit: false, reason: handDescription, rollover: true };
     };
@@ -720,9 +723,15 @@ export default function Kicker() {
       console.log('High card winner:', highCardPlayers[0].name);
       return { name: highCardPlayers[0].name, isSplit: false, reason: `${highestCard.rank} high`, rollover: false };
     } else {
-      // Tie - rollover
-      console.log('High card tie - rollover');
-      return { name: 'Tie', isSplit: false, reason: `${highestCard.rank} high - Tie!`, rollover: true };
+      // Multiple players tied for high card - they split
+      console.log('High card split:', highCardPlayers.map(p => p.name));
+      return {
+        name: highCardPlayers.map(p => p.name).join(' & '),
+        isSplit: true,
+        players: highCardPlayers,
+        reason: `${highestCard.rank} high`,
+        rollover: false
+      };
     }
   };
 
