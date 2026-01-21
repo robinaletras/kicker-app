@@ -421,12 +421,37 @@ export default function Kicker() {
     console.log('Board:', communalCard?.rank, communalCard?.suit, 'value:', communalCard?.value);
     console.log('Active players:', activePlayers.map(p => `${p.name}: ${p.card?.rank}${p.card?.suit} (${p.card?.value})`));
 
+    // Even with 1 player, they must beat the board
     if (activePlayers.length === 1) {
+      const player = activePlayers[0];
+      const boardValue = communalCard!.value;
+
+      // Check if player pairs with board
+      if (player.card!.value === boardValue) {
+        return {
+          name: player.name,
+          isSplit: false,
+          reason: `Paired with board (${communalCard!.rank})`,
+          rollover: false
+        };
+      }
+
+      // Check if player beats board
+      if (player.card!.value > boardValue) {
+        return {
+          name: player.name,
+          isSplit: false,
+          reason: `Highest card (${player.card!.rank})`,
+          rollover: false
+        };
+      }
+
+      // Board wins - rollover
       return {
-        name: activePlayers[0].name,
+        name: 'Board',
         isSplit: false,
-        reason: 'Last player standing',
-        rollover: false
+        reason: `Board ${communalCard!.rank} is highest`,
+        rollover: true
       };
     }
 
