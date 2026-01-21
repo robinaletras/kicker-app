@@ -106,13 +106,14 @@ interface WinnerScreenProps {
   winner: Winner;
   pot: number;
   players: Player[];
+  boardCard: CardType | null;
   onNextRound: () => void;
   rollover: boolean;
 }
 
-const WinnerScreen = ({ winner, pot, players, onNextRound, rollover }: WinnerScreenProps) => (
+const WinnerScreen = ({ winner, pot, players, boardCard, onNextRound, rollover }: WinnerScreenProps) => (
   <div className="fixed inset-0 bg-gray-900/95 flex flex-col items-center justify-center z-50">
-    <div className="text-center p-4 max-w-sm">
+    <div className="text-center p-4 max-w-md">
       {rollover ? (
         <>
           <h2 className="font-display text-xl text-purple-400 mb-2">The Board was the best Kicker!</h2>
@@ -124,21 +125,49 @@ const WinnerScreen = ({ winner, pot, players, onNextRound, rollover }: WinnerScr
             {winner.isSplit ? `${winner.name} were the best Kickers!` : `${winner.name} was the best Kicker!`}
           </h2>
           <p className="text-sm text-gray-400 mb-1">{winner.reason}</p>
-          <p className="text-xl text-emerald-400 mb-4">${pot} pot</p>
+          <p className="text-xl text-emerald-400 mb-3">${pot} pot</p>
         </>
       )}
 
-      <div className="grid grid-cols-4 gap-2 mb-4">
-        {players.map((p, i) => (
-          <div key={i} className={`p-2 rounded-lg ${p.folded ? 'bg-gray-800 opacity-50' : 'bg-gray-800'}`}>
-            <div className="font-semibold text-white text-xs mb-1 truncate">{p.name}</div>
-            <div className="flex justify-center">
-              <Card card={p.card} small />
+      {/* All 5 cards: Board + 4 Players */}
+      <div className="flex justify-center items-end gap-2 mb-4">
+        {/* Board Card */}
+        <div className="text-center">
+          <div className="text-xs text-emerald-400 font-bold mb-1">Board</div>
+          <Card card={boardCard} small highlight={rollover} />
+        </div>
+
+        {/* Player Cards */}
+        {players.map((p, i) => {
+          const isWinner = !rollover && (
+            winner.isSplit
+              ? winner.players?.some(wp => wp.name === p.name)
+              : winner.name === p.name
+          );
+          const pairsBoard = p.card?.value === boardCard?.value;
+
+          return (
+            <div key={i} className={`text-center ${p.folded ? 'opacity-40' : ''}`}>
+              <div className={`text-xs mb-1 truncate max-w-[50px] ${isWinner ? 'text-amber-400 font-bold' : 'text-gray-400'}`}>
+                {p.name}
+              </div>
+              <Card
+                card={p.card}
+                small
+                highlight={isWinner && !p.folded}
+              />
+              <div className="mt-1">
+                {p.folded ? (
+                  <span className="text-red-400 text-xs">Folded</span>
+                ) : pairsBoard ? (
+                  <span className="text-yellow-400 text-xs">Pairs!</span>
+                ) : (
+                  <span className="text-emerald-400 text-xs">${p.chips}</span>
+                )}
+              </div>
             </div>
-            <div className="mt-1 text-emerald-400 text-xs">${p.chips}</div>
-            {p.folded && <div className="text-red-400 text-xs">Folded</div>}
-          </div>
-        ))}
+          );
+        })}
       </div>
 
       <button
@@ -861,6 +890,7 @@ export default function Kicker() {
           winner={winner}
           pot={pot}
           players={players}
+          boardCard={communalCard}
           onNextRound={handleNextRound}
           rollover={isRollover}
         />
