@@ -432,7 +432,7 @@ export default function Kicker() {
       setMessage(`${revealedPlayers[revealerIndex].name} reveals: ${revealedPlayers[revealerIndex].card!.rank}${revealedPlayers[revealerIndex].card!.suit}`);
 
       startNextBettingRound(revealedPlayers, nextReveal);
-    } else if (nextPlayer === bettingRoundStarter && currentBetAmount === 0) {
+    } else if (nextPlayer === bettingRoundStarter && currentBetToUse === 0) {
       const nextReveal = revealPhase + 1;
 
       let revealerIndex = -1;
