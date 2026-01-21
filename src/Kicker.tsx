@@ -57,6 +57,42 @@ interface CardProps {
   dimmed?: boolean;
 }
 
+const PokerChip = ({ color = '#ef4444', size = 24 }: { color?: string; size?: number }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" className="drop-shadow">
+    <ellipse cx="12" cy="12" rx="11" ry="11" fill={color} />
+    <ellipse cx="12" cy="12" rx="8" ry="8" fill="none" stroke="white" strokeWidth="1.5" strokeDasharray="3 2" />
+    <ellipse cx="12" cy="12" rx="4" ry="4" fill="white" fillOpacity="0.3" />
+  </svg>
+);
+
+const ChipStack = ({ chips }: { chips: number }) => {
+  // Show 1-5 chips based on amount (visual representation, not exact)
+  const stackCount = chips <= 0 ? 0 : chips <= 5 ? 1 : chips <= 15 ? 2 : chips <= 30 ? 3 : chips <= 50 ? 4 : 5;
+  const colors = ['#ef4444', '#22c55e', '#3b82f6', '#a855f7', '#f59e0b'];
+
+  if (stackCount === 0) {
+    return (
+      <div className="flex flex-col items-center">
+        <div className="text-gray-500 text-xs italic">No chips</div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex gap-1 items-end">
+      {Array.from({ length: stackCount }).map((_, stackIdx) => (
+        <div key={stackIdx} className="flex flex-col-reverse" style={{ marginBottom: stackIdx * 2 }}>
+          {Array.from({ length: Math.min(3, Math.ceil((chips - stackIdx * 10) / 5)) }).map((_, chipIdx) => (
+            <div key={chipIdx} style={{ marginTop: chipIdx > 0 ? -18 : 0 }}>
+              <PokerChip color={colors[stackIdx % colors.length]} size={24} />
+            </div>
+          ))}
+        </div>
+      ))}
+    </div>
+  );
+};
+
 const Card = ({ card, faceDown = false, small = false, highlight = false }: CardProps) => {
   const isRed = card?.suit === '♥' || card?.suit === '♦';
 
@@ -1489,6 +1525,15 @@ export default function Kicker() {
                     </div>
                   );
                 })}
+              </div>
+            </div>
+
+            {/* Your Chips */}
+            <div className="flex justify-center items-center gap-3 mt-2 flex-shrink-0">
+              <ChipStack chips={currentPlayerData.chips} />
+              <div className="text-center">
+                <div className="text-emerald-400 font-bold text-lg">${currentPlayerData.chips}</div>
+                <div className="text-gray-500 text-[10px]">Your chips</div>
               </div>
             </div>
 
