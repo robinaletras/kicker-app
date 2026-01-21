@@ -324,7 +324,7 @@ export default function Kicker() {
     // Collect antes only from players who can play
     const playingCount = newPlayers.filter(p => !p.eliminated && !p.folded).length;
     const antePlayers = newPlayers.map(p =>
-      (!p.eliminated && !p.folded) ? { ...p, chips: p.chips - 1 } : p
+      (!p.eliminated && !p.folded) ? { ...p, chips: p.chips - 1, totalRoundBet: 1 } : p
     );
 
     // Find first non-eliminated player after dealer
@@ -756,36 +756,110 @@ export default function Kicker() {
 
   const endRound = (finalPot?: number, finalPlayers?: Player[]) => {
     const playersToUse = finalPlayers || players;
-    const potToUse = finalPot !== undefined ? finalPot : pot;
-    const winnerResult = determineWinner(playersToUse);
+    let newPlayers = playersToUse.map(p => ({ ...p, revealed: true }));
 
-    if (winnerResult.rollover) {
-      setRolloverPot(potToUse);
-      setIsRollover(true);
-      const revealedPlayers = playersToUse.map(p => ({ ...p, revealed: true }));
-      setPlayers(revealedPlayers);
-      setWinner(winnerResult);
+    // Calculate side pots based on totalRoundBet
+    const activePlayers = newPlayers.filter(p => !p.folded && !p.eliminated);
+
+    // If only one active player, they win everything
+    if (activePlayers.length === 1) {
+      const winner = activePlayers[0];
+      const potToUse = finalPot !== undefined ? finalPot : pot;
+      newPlayers = newPlayers.map(p =>
+        p.name === winner.name ? { ...p, chips: p.chips + potToUse } : p
+      );
+      setPlayers(newPlayers);
+      setWinner({ name: winner.name, isSplit: false, reason: 'Last player standing', rollover: false });
+      setRolloverPot(0);
       setGameState('winner');
       return;
     }
 
-    let newPlayers = playersToUse.map(p => ({ ...p, revealed: true }));
+    // Get unique bet levels (for side pot calculation)
+    const betLevels = [...new Set(activePlayers.map(p => p.totalRoundBet))].sort((a, b) => a - b);
 
-    if (winnerResult.isSplit && winnerResult.players) {
-      const share = Math.floor(potToUse / winnerResult.players.length);
-      newPlayers = newPlayers.map(p => {
-        const isWinner = winnerResult.players!.some(wp => wp.name === p.name);
-        return isWinner ? { ...p, chips: p.chips + share } : p;
-      });
-    } else {
-      newPlayers = newPlayers.map(p =>
-        p.name === winnerResult.name ? { ...p, chips: p.chips + potToUse } : p
-      );
+    // Calculate pots at each level
+    interface PotInfo {
+      amount: number;
+      eligiblePlayers: Player[];
+      winner: Winner | null;
+    }
+    const pots: PotInfo[] = [];
+    let previousLevel = 0;
+
+    for (const level of betLevels) {
+      const contribution = level - previousLevel;
+      // All players who bet at least this level contribute
+      const contributors = newPlayers.filter(p => p.totalRoundBet >= level && !p.eliminated);
+      const potAmount = contribution * contributors.length;
+
+      // Eligible to WIN are non-folded players who contributed to this level
+      const eligiblePlayers = contributors.filter(p => !p.folded);
+
+      if (potAmount > 0 && eligiblePlayers.length > 0) {
+        pots.push({
+          amount: potAmount,
+          eligiblePlayers,
+          winner: null
+        });
+      }
+      previousLevel = level;
+    }
+
+    // Add any rollover to the first pot
+    if (rolloverPot > 0 && pots.length > 0) {
+      pots[0].amount += rolloverPot;
+    }
+
+    // Determine winner for each pot
+    let totalRollover = 0;
+    const potWinners: string[] = [];
+
+    for (const potInfo of pots) {
+      // Create a filtered player list for this pot's eligible players
+      const eligibleForPot = newPlayers.map(p => ({
+        ...p,
+        // Mark players not eligible for this pot as folded for winner determination
+        folded: p.folded || !potInfo.eligiblePlayers.some(ep => ep.name === p.name)
+      }));
+
+      const winnerResult = determineWinner(eligibleForPot);
+      potInfo.winner = winnerResult;
+
+      if (winnerResult.rollover) {
+        totalRollover += potInfo.amount;
+      } else if (winnerResult.isSplit && winnerResult.players) {
+        const share = Math.floor(potInfo.amount / winnerResult.players.length);
+        newPlayers = newPlayers.map(p => {
+          const isWinner = winnerResult.players!.some(wp => wp.name === p.name);
+          return isWinner ? { ...p, chips: p.chips + share } : p;
+        });
+        potWinners.push(`${winnerResult.name} split $${potInfo.amount}`);
+      } else {
+        newPlayers = newPlayers.map(p =>
+          p.name === winnerResult.name ? { ...p, chips: p.chips + potInfo.amount } : p
+        );
+        potWinners.push(`${winnerResult.name} won $${potInfo.amount}`);
+      }
+    }
+
+    // Use the first pot's winner for display (main pot)
+    const mainWinner = pots.length > 0 && pots[0].winner ? pots[0].winner : {
+      name: 'No winner',
+      isSplit: false,
+      reason: 'No eligible players',
+      rollover: true
+    };
+
+    // If there are side pots, add info to the reason
+    if (pots.length > 1) {
+      mainWinner.reason += ` (${pots.length} pots)`;
     }
 
     setPlayers(newPlayers);
-    setWinner(winnerResult);
-    setRolloverPot(0);
+    setWinner(mainWinner);
+    setRolloverPot(totalRollover);
+    setIsRollover(totalRollover > 0);
     setGameState('winner');
   };
 
@@ -1179,52 +1253,56 @@ export default function Kicker() {
 
         {gameState === 'setup' && (
           <div className="flex-1 flex flex-col gap-2 overflow-hidden">
-            <div className="p-2 bg-gray-900/80 rounded-xl flex-shrink-0">
-              <h3 className="font-semibold text-amber-400 mb-1 text-xs">Player Names</h3>
-              <div className="grid grid-cols-2 gap-1.5">
-                {playerNames.map((name, i) => (
-                  <div key={i} className="relative">
-                    <input
-                      type="text"
-                      value={name}
-                      onChange={(e) => handleNameChange(i, e.target.value)}
-                      onFocus={(e) => {
-                        if (name === `Player ${i + 1}` || isPlayerAI[i]) {
-                          const newNames = [...playerNames];
-                          newNames[i] = '';
-                          setPlayerNames(newNames);
-                          if (isPlayerAI[i]) {
-                            const newIsAI = [...isPlayerAI];
-                            newIsAI[i] = false;
-                            setIsPlayerAI(newIsAI);
+            <div className="p-3 bg-gray-900/80 rounded-xl flex-shrink-0">
+              <h3 className="font-semibold text-amber-400 mb-2 text-sm">Player Names</h3>
+              <div className="grid grid-cols-2 gap-3">
+                {/* Reorder: Player 1 & 3 on top, Player 2 & 4 on bottom */}
+                {[0, 2, 1, 3].map((i) => {
+                  const name = playerNames[i];
+                  return (
+                    <div key={i} className="relative">
+                      <input
+                        type="text"
+                        value={name}
+                        onChange={(e) => handleNameChange(i, e.target.value)}
+                        onFocus={(e) => {
+                          if (name === `Player ${i + 1}` || isPlayerAI[i]) {
+                            const newNames = [...playerNames];
+                            newNames[i] = '';
+                            setPlayerNames(newNames);
+                            if (isPlayerAI[i]) {
+                              const newIsAI = [...isPlayerAI];
+                              newIsAI[i] = false;
+                              setIsPlayerAI(newIsAI);
+                            }
                           }
-                        }
-                        e.target.select();
-                      }}
-                      onBlur={() => {
-                        if (name.trim() === '') {
-                          const newNames = [...playerNames];
-                          newNames[i] = `Player ${i + 1}`;
-                          setPlayerNames(newNames);
-                        }
-                      }}
-                      className={`w-full px-2 py-1 bg-gray-800 border rounded text-white text-xs ${isPlayerAI[i] ? 'border-cyan-400' : i === dealer ? 'border-amber-400' : 'border-gray-700'}`}
-                      placeholder={`Player ${i + 1}`}
-                    />
-                    {isPlayerAI[i] && (
-                      <span className="absolute -top-1.5 -left-1 bg-cyan-500 text-gray-900 text-[10px] font-bold px-1.5 py-0 rounded-full">
-                        AI
-                      </span>
-                    )}
-                    {i === dealer && (
-                      <span className="absolute -top-1.5 -right-1 bg-amber-500 text-gray-900 text-[10px] font-bold px-1 py-0 rounded-full">
-                        D
-                      </span>
-                    )}
-                  </div>
-                ))}
+                          e.target.select();
+                        }}
+                        onBlur={() => {
+                          if (name.trim() === '') {
+                            const newNames = [...playerNames];
+                            newNames[i] = `Player ${i + 1}`;
+                            setPlayerNames(newNames);
+                          }
+                        }}
+                        className={`w-full px-3 py-2 bg-gray-800 border-2 rounded-lg text-white text-sm ${isPlayerAI[i] ? 'border-cyan-400' : i === dealer ? 'border-amber-400' : 'border-gray-700'}`}
+                        placeholder={`Player ${i + 1}`}
+                      />
+                      {isPlayerAI[i] && (
+                        <span className="absolute -top-2 -left-1 bg-cyan-500 text-gray-900 text-xs font-bold px-2 py-0.5 rounded-full">
+                          AI
+                        </span>
+                      )}
+                      {i === dealer && (
+                        <span className="absolute -top-2 -right-1 bg-amber-500 text-gray-900 text-xs font-bold px-2 py-0.5 rounded-full">
+                          D
+                        </span>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
-              <div className="mt-1 text-center text-[10px] text-gray-400">
+              <div className="mt-2 text-center text-xs text-gray-400">
                 {playerNames[dealer]} deals • Type "AI" for bots
               </div>
             </div>
