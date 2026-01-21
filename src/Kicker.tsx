@@ -28,7 +28,14 @@ interface Player {
   eliminated: boolean;
   peekedCards: CardType[];
   currentBet: number;
+  totalRoundBet: number; // Total bet this round (for side pot calculation)
+  allIn: boolean;
   aiLevel?: AISkillLevel;
+}
+
+interface SidePot {
+  amount: number;
+  eligiblePlayers: string[]; // Player names eligible to win this pot
 }
 
 interface Winner {
@@ -224,13 +231,15 @@ export default function Kicker() {
   const [deck, setDeck] = useState<CardType[]>([]);
   const [communalCard, setCommunalCard] = useState<CardType | null>(null);
   const [players, setPlayers] = useState<Player[]>([
-    { name: 'Player 1', chips: 50, card: null, revealed: false, folded: false, eliminated: false, peekedCards: [], currentBet: 0 },
-    { name: 'Player 2', chips: 50, card: null, revealed: false, folded: false, eliminated: false, peekedCards: [], currentBet: 0 },
-    { name: 'Player 3', chips: 50, card: null, revealed: false, folded: false, eliminated: false, peekedCards: [], currentBet: 0 },
-    { name: 'Player 4', chips: 50, card: null, revealed: false, folded: false, eliminated: false, peekedCards: [], currentBet: 0 },
+    { name: 'Player 1', chips: 50, card: null, revealed: false, folded: false, eliminated: false, peekedCards: [], currentBet: 0, totalRoundBet: 0, allIn: false },
+    { name: 'Player 2', chips: 50, card: null, revealed: false, folded: false, eliminated: false, peekedCards: [], currentBet: 0, totalRoundBet: 0, allIn: false },
+    { name: 'Player 3', chips: 50, card: null, revealed: false, folded: false, eliminated: false, peekedCards: [], currentBet: 0, totalRoundBet: 0, allIn: false },
+    { name: 'Player 4', chips: 50, card: null, revealed: false, folded: false, eliminated: false, peekedCards: [], currentBet: 0, totalRoundBet: 0, allIn: false },
   ]);
   const [pot, setPot] = useState(0);
+  const [_sidePots, setSidePots] = useState<SidePot[]>([]); // TODO: Implement full side pot logic
   const [rolloverPot, setRolloverPot] = useState(0);
+  const [aiRaiseCount, setAiRaiseCount] = useState<Record<number, number>>({}); // Track raises per AI player per betting round
   const [currentPlayer, setCurrentPlayer] = useState(0);
   const [currentBetAmount, setCurrentBetAmount] = useState(0);
   const [revealPhase, setRevealPhase] = useState(0);
@@ -306,6 +315,8 @@ export default function Kicker() {
         eliminated: p.eliminated || p.chips < 1,
         peekedCards: [],
         currentBet: 0,
+        totalRoundBet: 0,
+        allIn: false,
         aiLevel: isPlayerAI[i] ? getRandomAILevel() : undefined,
       };
     });
@@ -328,6 +339,8 @@ export default function Kicker() {
     setCommunalCard(communal);
     setPlayers(antePlayers);
     setPot(playingCount + rolloverPot);
+    setSidePots([]);
+    setAiRaiseCount({});
     setCurrentPlayer(firstToAct);
     setCurrentBetAmount(0);
     setRevealPhase(0);
@@ -347,10 +360,12 @@ export default function Kicker() {
 
   const getActivePlayers = () => players.filter(p => !p.folded && !p.eliminated);
 
-  const findNextActivePlayer = (fromIndex: number) => {
+  const findNextActivePlayer = (fromIndex: number, playersToCheck?: Player[]) => {
+    const playerList = playersToCheck || players;
     let next = (fromIndex + 1) % 4;
     let attempts = 0;
-    while ((players[next].folded || players[next].eliminated) && attempts < 4) {
+    // Skip folded, eliminated, AND all-in players (they can't act)
+    while ((playerList[next].folded || playerList[next].eliminated || playerList[next].allIn) && attempts < 4) {
       next = (next + 1) % 4;
       attempts++;
     }
@@ -358,7 +373,7 @@ export default function Kicker() {
   };
 
   // AI Decision Making
-  const makeAIDecision = (player: Player): { action: Action; amount?: number } => {
+  const makeAIDecision = (player: Player, playerIndex: number): { action: Action; amount?: number } => {
     const myCard = player.card!;
     const aiLevel = player.aiLevel!;
     const toCall = currentBetAmount - player.currentBet;
@@ -367,6 +382,10 @@ export default function Kicker() {
     const canAffordCall = availableChips >= toCall;
     const maxBet = availableChips;
     const maxRaise = availableChips - toCall;
+
+    // AI can only raise twice per betting round to prevent endless loops
+    const aiRaises = aiRaiseCount[playerIndex] || 0;
+    const canRaise = aiRaises < 2;
 
     // Get revealed cards that are higher than mine
     const revealedHigherCards = players.filter(
@@ -407,8 +426,8 @@ export default function Kicker() {
       if (!pairsWithBoard && toCall > 0 && Math.random() < 0.3) {
         return { action: 'fold' };
       }
-      // 20% chance to bet/raise if we can afford it
-      if (Math.random() < 0.2) {
+      // 20% chance to bet/raise if we can afford it AND haven't raised too much
+      if (canRaise && Math.random() < 0.2) {
         const amount = Math.min(Math.floor(Math.random() * 3) + 1, canCheck ? maxBet : maxRaise);
         if (amount > 0) {
           if (canCheck) return { action: 'bet', amount };
@@ -421,8 +440,8 @@ export default function Kicker() {
     }
 
     if (aiLevel === 'aggressive') {
-      // Never folds, often bets/raises
-      if (pairsWithBoard) {
+      // Never folds, often bets/raises (but limited to 2 raises)
+      if (canRaise && pairsWithBoard) {
         // Always raise big with board pair (limited by chips)
         const amount = Math.min(3, canCheck ? maxBet : maxRaise);
         if (amount > 0) {
@@ -430,8 +449,8 @@ export default function Kicker() {
           return { action: 'raise', amount };
         }
       }
-      // 50% chance to bet/raise if we can afford it
-      if (Math.random() < 0.5) {
+      // 50% chance to bet/raise if we can afford it AND haven't raised too much
+      if (canRaise && Math.random() < 0.5) {
         const amount = Math.min(Math.floor(Math.random() * 2) + 1, canCheck ? maxBet : maxRaise);
         if (amount > 0) {
           if (canCheck) return { action: 'bet', amount };
@@ -780,6 +799,7 @@ export default function Kicker() {
     setPlayers(resetPlayers);
     setCurrentBetAmount(0);
     setLastRaiser(-1);
+    setAiRaiseCount({}); // Reset AI raise count for new betting round
 
     let starter = 0;
     while (starter < 4 && resetPlayers[starter].folded) {
@@ -801,15 +821,23 @@ export default function Kicker() {
     const playersToUse = updatedPlayers || players;
     const potToUse = updatedPot !== undefined ? updatedPot : pot;
     const activePlayers = playersToUse.filter(p => !p.folded && !p.eliminated);
+    const playersWhoCanAct = playersToUse.filter(p => !p.folded && !p.eliminated && !p.allIn);
     const lastRaiserToUse = newLastRaiser !== undefined ? newLastRaiser : lastRaiser;
     const currentBetToUse = newCurrentBet !== undefined ? newCurrentBet : currentBetAmount;
 
+    // If only one active player left, they win
     if (activePlayers.length === 1) {
       endRound(potToUse, playersToUse);
       return;
     }
 
-    const nextPlayer = findNextActivePlayer(currentPlayer);
+    // If no one can act (all are all-in or folded), end the round
+    if (playersWhoCanAct.length === 0) {
+      endRound(potToUse, playersToUse);
+      return;
+    }
+
+    const nextPlayer = findNextActivePlayer(currentPlayer, playersToUse);
 
     if (nextPlayer === -1) {
       endRound(potToUse, playersToUse);
@@ -891,37 +919,51 @@ export default function Kicker() {
     // Always create a fresh copy to preserve all state including revealed
     let newPlayers = players.map(p => ({ ...p }));
 
+    // Helper to update player with all-in detection
+    const updatePlayer = (p: Player, i: number, chipCost: number, newBet: number): Player => {
+      if (i !== currentPlayer) return p;
+      const newChips = p.chips - chipCost;
+      const isAllIn = newChips <= 0;
+      return {
+        ...p,
+        chips: Math.max(0, newChips),
+        currentBet: newBet,
+        totalRoundBet: p.totalRoundBet + chipCost,
+        allIn: isAllIn || p.allIn
+      };
+    };
+
     if (action === 'bet') {
       // Limit bet to available chips
       const actualBet = Math.min(amount, player.chips);
       if (actualBet <= 0) return; // Can't bet with no chips
-      newPlayers = newPlayers.map((p, i) =>
-        i === currentPlayer ? { ...p, chips: p.chips - actualBet, currentBet: p.currentBet + actualBet } : p
-      );
+      const isAllIn = actualBet >= player.chips;
+      newPlayers = newPlayers.map((p, i) => updatePlayer(p, i, actualBet, p.currentBet + actualBet));
       newPot = pot + actualBet;
       setCurrentBetAmount(actualBet);
       setLastRaiser(currentPlayer);
-      setMessage(`${player.name} bet $${actualBet}`);
+      // Track AI raises (bet counts as first raise)
+      if (player.aiLevel) {
+        setAiRaiseCount(prev => ({ ...prev, [currentPlayer]: (prev[currentPlayer] || 0) + 1 }));
+      }
+      setMessage(`${player.name} ${isAllIn ? 'went all-in with' : 'bet'} $${actualBet}`);
       advanceToNextPlayer(newPlayers, newPot, currentPlayer, actualBet);
       return;
     } else if (action === 'call') {
       // Limit call to available chips (all-in if can't afford full call)
       const actualCall = Math.min(toCall, player.chips);
-      newPlayers = newPlayers.map((p, i) =>
-        i === currentPlayer ? { ...p, chips: p.chips - actualCall, currentBet: p.currentBet + actualCall } : p
-      );
+      const isAllIn = actualCall >= player.chips;
+      newPlayers = newPlayers.map((p, i) => updatePlayer(p, i, actualCall, p.currentBet + actualCall));
       newPot = pot + actualCall;
-      setMessage(`${player.name} ${actualCall < toCall ? 'went all-in with' : 'called'} $${actualCall}`);
+      setMessage(`${player.name} ${isAllIn ? 'went all-in with' : 'called'} $${actualCall}`);
     } else if (action === 'raise') {
       // Limit raise to available chips
       const maxRaise = player.chips - toCall;
       const actualRaise = Math.min(amount, maxRaise);
       if (actualRaise <= 0) {
-        // Can't raise, just call
+        // Can't raise, just call (all-in)
         const actualCall = Math.min(toCall, player.chips);
-        newPlayers = newPlayers.map((p, i) =>
-          i === currentPlayer ? { ...p, chips: p.chips - actualCall, currentBet: p.currentBet + actualCall } : p
-        );
+        newPlayers = newPlayers.map((p, i) => updatePlayer(p, i, actualCall, p.currentBet + actualCall));
         newPot = pot + actualCall;
         setMessage(`${player.name} went all-in with $${actualCall}`);
         advanceToNextPlayer(newPlayers, newPot);
@@ -929,13 +971,16 @@ export default function Kicker() {
       }
       const totalCost = toCall + actualRaise;
       const newBetAmount = currentBetAmount + actualRaise;
-      newPlayers = newPlayers.map((p, i) =>
-        i === currentPlayer ? { ...p, chips: p.chips - totalCost, currentBet: newBetAmount } : p
-      );
+      const isAllIn = totalCost >= player.chips;
+      newPlayers = newPlayers.map((p, i) => updatePlayer(p, i, totalCost, newBetAmount));
       newPot = pot + totalCost;
       setCurrentBetAmount(newBetAmount);
       setLastRaiser(currentPlayer);
-      setMessage(`${player.name} raised $${amount} (total: $${newBetAmount})`);
+      // Track AI raises
+      if (player.aiLevel) {
+        setAiRaiseCount(prev => ({ ...prev, [currentPlayer]: (prev[currentPlayer] || 0) + 1 }));
+      }
+      setMessage(`${player.name} ${isAllIn ? 'went all-in, raising to' : 'raised to'} $${newBetAmount}`);
       advanceToNextPlayer(newPlayers, newPot, currentPlayer, newBetAmount);
       return;
     } else if (action === 'check') {
@@ -974,8 +1019,12 @@ export default function Kicker() {
       eliminated: p.eliminated || p.chips <= 0,
       peekedCards: [],
       currentBet: 0,
+      totalRoundBet: 0,
+      allIn: false,
     }));
     setPlayers(resetPlayers);
+    setSidePots([]);
+    setAiRaiseCount({});
 
     // Find next non-eliminated dealer
     let nextDealer = (dealer + 1) % 4;
@@ -1024,7 +1073,7 @@ export default function Kicker() {
       setAiPendingAction(null);
     } else {
       // Compute and show the decision
-      const decision = makeAIDecision(currentPlayerData);
+      const decision = makeAIDecision(currentPlayerData, currentPlayer);
       setAiPendingAction(decision);
     }
   };
@@ -1054,7 +1103,7 @@ export default function Kicker() {
       if (!aiPendingAction) {
         // First, compute and show the decision
         const timer = setTimeout(() => {
-          const decision = makeAIDecision(currentPlayerData);
+          const decision = makeAIDecision(currentPlayerData, currentPlayer);
           setAiPendingAction(decision);
         }, thinkDelay);
         return () => clearTimeout(timer);
