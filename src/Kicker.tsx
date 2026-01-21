@@ -173,12 +173,12 @@ export default function Kicker() {
   const [winner, setWinner] = useState<Winner | null>(null);
   const [isRollover, setIsRollover] = useState(false);
   const [playerNames, setPlayerNames] = useState(['Player 1', 'Player 2', 'Player 3', 'Player 4']);
+  const [isPlayerAI, setIsPlayerAI] = useState([false, false, false, false]);
+  const [autoAI, setAutoAI] = useState(true);
   const [lastRaiser, setLastRaiser] = useState(-1);
   const [bettingRoundStarter, setBettingRoundStarter] = useState(0);
   const [dealer, setDealer] = useState(0);
   const [revealOrder, setRevealOrder] = useState<number[]>([]);
-
-  const isAI = (name: string) => name.toLowerCase() === 'ai';
 
   const AI_NAMES = [
     'Alex', 'Sam', 'Jordan', 'Taylor', 'Casey',
@@ -187,10 +187,28 @@ export default function Kicker() {
     'Kelly', 'Logan', 'Max', 'Peyton', 'Reese'
   ];
 
-  const getRandomAIName = (usedNames: string[]): string => {
-    const available = AI_NAMES.filter(n => !usedNames.includes(n));
+  const getRandomAIName = (excludeNames: string[]): string => {
+    const available = AI_NAMES.filter(n => !excludeNames.includes(n));
     if (available.length === 0) return AI_NAMES[Math.floor(Math.random() * AI_NAMES.length)];
     return available[Math.floor(Math.random() * available.length)];
+  };
+
+  const handleNameChange = (index: number, value: string) => {
+    const newNames = [...playerNames];
+    const newIsAI = [...isPlayerAI];
+
+    if (value.toLowerCase() === 'ai') {
+      // Get names already used by other AI players
+      const usedNames = playerNames.filter((_, i) => i !== index && isPlayerAI[i]);
+      newNames[index] = getRandomAIName(usedNames);
+      newIsAI[index] = true;
+    } else {
+      newNames[index] = value;
+      newIsAI[index] = false;
+    }
+
+    setPlayerNames(newNames);
+    setIsPlayerAI(newIsAI);
   };
 
   const getRandomAILevel = (): AISkillLevel => {
@@ -208,26 +226,16 @@ export default function Kicker() {
     }
     setRevealOrder(order);
 
-    // Assign random names to AI players
-    const usedAINames: string[] = [];
-    const newPlayers = players.map((p, i) => {
-      const isAIPlayer = isAI(playerNames[i]);
-      let name = playerNames[i];
-      if (isAIPlayer) {
-        name = getRandomAIName(usedAINames);
-        usedAINames.push(name);
-      }
-      return {
-        ...p,
-        name,
-        card: newDeck.pop()!,
-        revealed: false,
-        folded: false,
-        peekedCards: [],
-        currentBet: 0,
-        aiLevel: isAIPlayer ? getRandomAILevel() : undefined,
-      };
-    });
+    const newPlayers = players.map((p, i) => ({
+      ...p,
+      name: playerNames[i],
+      card: newDeck.pop()!,
+      revealed: false,
+      folded: false,
+      peekedCards: [],
+      currentBet: 0,
+      aiLevel: isPlayerAI[i] ? getRandomAILevel() : undefined,
+    }));
 
     const antePlayers = newPlayers.map(p => ({ ...p, chips: p.chips - 1 }));
 
@@ -677,8 +685,16 @@ export default function Kicker() {
 
   const { boardHighest } = getHighlightInfo();
 
+  // Function to trigger AI turn (used by both auto and manual modes)
+  const triggerAITurn = () => {
+    if (!currentPlayerData?.aiLevel) return;
+    const decision = makeAIDecision(currentPlayerData);
+    handleAction(decision.action, decision.amount || 0);
+  };
+
   // AI auto-play effect
   useEffect(() => {
+    if (!autoAI) return;
     if (gameState !== 'playing' && gameState !== 'passing') return;
     if (!currentPlayerData?.aiLevel) return;
     if (winner) return;
@@ -687,16 +703,15 @@ export default function Kicker() {
     if (showPassScreen && gameState === 'passing') {
       const timer = setTimeout(() => {
         handleReady();
-      }, 500);
+      }, 800);
       return () => clearTimeout(timer);
     }
 
     // Make AI decision when it's their turn to play
     if (gameState === 'playing' && !showPassScreen) {
       const timer = setTimeout(() => {
-        const decision = makeAIDecision(currentPlayerData);
-        handleAction(decision.action, decision.amount || 0);
-      }, 1000);
+        triggerAITurn();
+      }, 1500);
       return () => clearTimeout(timer);
     }
   }, [gameState, currentPlayer, showPassScreen, currentPlayerData?.aiLevel, winner]);
@@ -710,7 +725,27 @@ export default function Kicker() {
       `}</style>
 
       {showPassScreen && (
-        <PassScreen playerName={players[currentPlayer].name} onReady={handleReady} />
+        players[currentPlayer]?.aiLevel ? (
+          // AI player pass screen
+          <div className="fixed inset-0 bg-gray-900 flex flex-col items-center justify-center z-50">
+            <div className="text-center p-8">
+              <h2 className="font-display text-4xl text-cyan-400 mb-6">{players[currentPlayer].name}'s Turn</h2>
+              <p className="text-gray-400 mb-2 text-lg">({players[currentPlayer].aiLevel} AI)</p>
+              {autoAI ? (
+                <p className="text-cyan-400 animate-pulse text-lg mt-8">Starting turn...</p>
+              ) : (
+                <button
+                  onClick={handleReady}
+                  className="mt-8 px-12 py-6 bg-gradient-to-r from-cyan-600 to-cyan-500 text-white rounded-xl font-bold text-xl shadow-lg hover:from-cyan-500 hover:to-cyan-400 transition-all transform hover:scale-105"
+                >
+                  Next
+                </button>
+              )}
+            </div>
+          </div>
+        ) : (
+          <PassScreen playerName={players[currentPlayer].name} onReady={handleReady} />
+        )
       )}
 
       {winner && (
@@ -744,16 +779,17 @@ export default function Kicker() {
                     <input
                       type="text"
                       value={name}
-                      onChange={(e) => {
-                        const newNames = [...playerNames];
-                        newNames[i] = e.target.value;
-                        setPlayerNames(newNames);
-                      }}
+                      onChange={(e) => handleNameChange(i, e.target.value)}
                       onFocus={(e) => {
-                        if (name === `Player ${i + 1}`) {
+                        if (name === `Player ${i + 1}` || isPlayerAI[i]) {
                           const newNames = [...playerNames];
                           newNames[i] = '';
                           setPlayerNames(newNames);
+                          if (isPlayerAI[i]) {
+                            const newIsAI = [...isPlayerAI];
+                            newIsAI[i] = false;
+                            setIsPlayerAI(newIsAI);
+                          }
                         }
                         e.target.select();
                       }}
@@ -764,10 +800,10 @@ export default function Kicker() {
                           setPlayerNames(newNames);
                         }
                       }}
-                      className={`w-full px-3 py-2 bg-gray-800 border rounded-lg text-white ${i === dealer ? 'border-amber-400' : 'border-gray-700'}`}
+                      className={`w-full px-3 py-2 bg-gray-800 border rounded-lg text-white ${isPlayerAI[i] ? 'border-cyan-400' : i === dealer ? 'border-amber-400' : 'border-gray-700'}`}
                       placeholder={`Player ${i + 1}`}
                     />
-                    {isAI(name) && (
+                    {isPlayerAI[i] && (
                       <span className="absolute -top-2 -left-2 bg-cyan-500 text-gray-900 text-xs font-bold px-2 py-0.5 rounded-full">
                         AI
                       </span>
@@ -842,6 +878,22 @@ export default function Kicker() {
               </div>
             </div>
 
+            {/* AI Auto/Manual Toggle */}
+            {players.some(p => p.aiLevel) && (
+              <div className="flex justify-center mb-3">
+                <button
+                  onClick={() => setAutoAI(!autoAI)}
+                  className={`px-4 py-1 rounded-full text-sm font-medium transition-colors ${
+                    autoAI
+                      ? 'bg-cyan-600 text-white'
+                      : 'bg-gray-700 text-gray-300'
+                  }`}
+                >
+                  AI: {autoAI ? 'Auto' : 'Manual'}
+                </button>
+              </div>
+            )}
+
             <div className="text-center mb-3 text-sm text-gray-300">{message}</div>
 
             {/* Current Player Actions */}
@@ -858,8 +910,20 @@ export default function Kicker() {
 
               {/* AI Thinking Indicator */}
               {currentPlayerData.aiLevel && (
-                <div className="text-center py-8">
-                  <div className="text-cyan-400 text-lg animate-pulse">AI is thinking...</div>
+                <div className="text-center py-6">
+                  {autoAI ? (
+                    <div className="text-cyan-400 text-lg animate-pulse">AI is thinking...</div>
+                  ) : (
+                    <div className="space-y-3">
+                      <div className="text-cyan-400 text-lg">Waiting for AI move...</div>
+                      <button
+                        onClick={triggerAITurn}
+                        className="px-8 py-3 bg-cyan-600 hover:bg-cyan-500 text-white rounded-lg font-bold transition-colors"
+                      >
+                        Next
+                      </button>
+                    </div>
+                  )}
                 </div>
               )}
 
