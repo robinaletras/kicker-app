@@ -461,7 +461,7 @@ export default function Kicker() {
       // Explicitly preserve all player state including revealed
       const preservedPlayers = playersToUse.map(p => ({ ...p, revealed: p.revealed }));
       setPlayers(preservedPlayers);
-      if (updatedPot !== undefined) setPot(potToUse);
+      setPot(potToUse);
       setShowPassScreen(true);
       setGameState('passing');
     }
@@ -481,7 +481,6 @@ export default function Kicker() {
       newPot = pot + amount;
       setCurrentBetAmount(amount);
       setLastRaiser(currentPlayer);
-      setPot(newPot);
       setMessage(`${player.name} bet $${amount}`);
       advanceToNextPlayer(newPlayers, newPot, currentPlayer, amount);
       return;
@@ -490,7 +489,6 @@ export default function Kicker() {
         i === currentPlayer ? { ...p, chips: p.chips - toCall, currentBet: currentBetAmount } : p
       );
       newPot = pot + toCall;
-      setPot(newPot);
       setMessage(`${player.name} called $${toCall}`);
     } else if (action === 'raise') {
       const totalCost = toCall + amount;
@@ -501,7 +499,6 @@ export default function Kicker() {
       newPot = pot + totalCost;
       setCurrentBetAmount(newBetAmount);
       setLastRaiser(currentPlayer);
-      setPot(newPot);
       setMessage(`${player.name} raised $${amount} (total: $${newBetAmount})`);
       advanceToNextPlayer(newPlayers, newPot, currentPlayer, newBetAmount);
       return;
