@@ -514,9 +514,11 @@ export default function Kicker() {
     // Kicker only describes the hand, doesn't determine winner
     const resolveByHandMaker = (handDescription: string, usedValues: Set<number>, handMakers: Player[]): Winner => {
       const kickerDesc = getKickerDescription(usedValues);
+      console.log('resolveByHandMaker:', handDescription, 'handMakers:', handMakers.map(p => p.name));
 
       if (handMakers.length === 1) {
         // One player made the hand - they win
+        console.log('Winner:', handMakers[0].name);
         return {
           name: handMakers[0].name,
           isSplit: false,
@@ -525,6 +527,7 @@ export default function Kicker() {
         };
       } else if (handMakers.length > 1) {
         // Multiple players made the hand - tie, rollover
+        console.log('Tie - rollover');
         return {
           name: 'Tie',
           isSplit: false,
@@ -533,8 +536,16 @@ export default function Kicker() {
         };
       }
       // No players made the hand (shouldn't happen for most hands)
+      console.log('No handMakers - Board rollover');
       return { name: 'Board', isSplit: false, reason: handDescription, rollover: true };
     };
+
+    // DEBUG: Log hand evaluation
+    console.log('=== HAND EVALUATION ===');
+    console.log('All cards:', allCards.map(c => `${c.rank}${c.suit}${c.isBoard ? '(B)' : `(${c.player?.name})`}`));
+    console.log('Pairs:', pairs.map(p => `${p.value} by [${p.players.map(pl => pl.name).join(', ')}]`));
+    console.log('Trips:', trips ? `${trips.value} by [${trips.players.map(pl => pl.name).join(', ')}]` : 'none');
+    console.log('isFlush:', isFlush, 'isStraight:', isStraight);
 
     // Evaluate hand type from highest to lowest
     // 1. Straight Flush
@@ -667,19 +678,23 @@ export default function Kicker() {
     }
 
     // 9. High card
+    console.log('Fell through to HIGH CARD - no pairs/trips detected!');
     const sortedCards = [...allCards].sort((a, b) => b.value - a.value);
     const highestCard = sortedCards[0];
 
     if (highestCard.isBoard) {
+      console.log('Board has high card - rollover');
       return { name: 'Board', isSplit: false, reason: `${boardRank} high - Board wins`, rollover: true };
     }
 
     // Player has high card
     const highCardPlayers = activePlayers.filter(p => p.card!.value === highestCard.value);
     if (highCardPlayers.length === 1) {
+      console.log('High card winner:', highCardPlayers[0].name);
       return { name: highCardPlayers[0].name, isSplit: false, reason: `${highestCard.rank} high`, rollover: false };
     } else {
       // Tie - rollover
+      console.log('High card tie - rollover');
       return { name: 'Tie', isSplit: false, reason: `${highestCard.rank} high - Tie!`, rollover: true };
     }
   };
