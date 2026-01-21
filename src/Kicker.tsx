@@ -415,135 +415,192 @@ export default function Kicker() {
   const determineWinner = (playersToCheck?: Player[]): Winner => {
     const playerList = playersToCheck || players;
     const activePlayers = playerList.filter(p => !p.folded && !p.eliminated);
-
-    // Debug logging
-    console.log('=== DETERMINE WINNER ===');
-    console.log('Board:', communalCard?.rank, communalCard?.suit, 'value:', communalCard?.value);
-    console.log('Active players:', activePlayers.map(p => `${p.name}: ${p.card?.rank}${p.card?.suit} (${p.card?.value})`));
-
-    // Even with 1 player, they must beat the board
-    if (activePlayers.length === 1) {
-      const player = activePlayers[0];
-      const boardValue = communalCard!.value;
-
-      // Check if player pairs with board
-      if (player.card!.value === boardValue) {
-        return {
-          name: player.name,
-          isSplit: false,
-          reason: `Paired with board (${communalCard!.rank})`,
-          rollover: false
-        };
-      }
-
-      // Check if player beats board
-      if (player.card!.value > boardValue) {
-        return {
-          name: player.name,
-          isSplit: false,
-          reason: `Highest card (${player.card!.rank})`,
-          rollover: false
-        };
-      }
-
-      // Board wins - rollover
-      return {
-        name: 'Board',
-        isSplit: false,
-        reason: `Board ${communalCard!.rank} is highest`,
-        rollover: true
-      };
-    }
-
     const boardValue = communalCard!.value;
+    const boardRank = communalCard!.rank;
 
-    // Collect ALL pairs - both board pairs and player pairs
-    const allPairs: { value: number; players: Player[]; isBoard: boolean }[] = [];
+    // Collect all card values for hand evaluation
+    const allCards = [
+      { value: boardValue, rank: boardRank, isBoard: true, player: null as Player | null },
+      ...activePlayers.map(p => ({ value: p.card!.value, rank: p.card!.rank, isBoard: false, player: p }))
+    ];
 
-    // Board pairs (player card matches board)
-    const boardPairPlayers = activePlayers.filter(p => p.card!.value === boardValue);
-    if (boardPairPlayers.length > 0) {
-      allPairs.push({
-        value: boardValue,
-        players: boardPairPlayers,
-        isBoard: true
-      });
-      console.log('Board pair found:', boardPairPlayers.map(p => p.name));
+    // Count occurrences of each value to find pairs/trips
+    const valueCounts: Record<number, { count: number; players: Player[]; includesBoard: boolean }> = {};
+    for (const card of allCards) {
+      if (!valueCounts[card.value]) {
+        valueCounts[card.value] = { count: 0, players: [], includesBoard: false };
+      }
+      valueCounts[card.value].count++;
+      if (card.isBoard) {
+        valueCounts[card.value].includesBoard = true;
+      } else if (card.player) {
+        valueCounts[card.value].players.push(card.player);
+      }
     }
 
-    // Player pairs (two players have matching cards)
-    for (let i = 0; i < activePlayers.length; i++) {
-      for (let j = i + 1; j < activePlayers.length; j++) {
-        if (activePlayers[i].card!.value === activePlayers[j].card!.value) {
-          allPairs.push({
-            value: activePlayers[i].card!.value,
-            players: [activePlayers[i], activePlayers[j]],
-            isBoard: false
-          });
-          console.log('Player pair found:', activePlayers[i].name, '&', activePlayers[j].name, 'value:', activePlayers[i].card!.value);
+    // Find all pairs and trips
+    const pairs: { value: number; players: Player[]; includesBoard: boolean }[] = [];
+    let trips: { value: number; players: Player[]; includesBoard: boolean } | null = null;
+
+    for (const [valueStr, data] of Object.entries(valueCounts)) {
+      const value = parseInt(valueStr);
+      if (data.count >= 3) {
+        trips = { value, players: data.players, includesBoard: data.includesBoard };
+      } else if (data.count === 2) {
+        pairs.push({ value, players: data.players, includesBoard: data.includesBoard });
+      }
+    }
+
+    // Sort pairs by value descending
+    pairs.sort((a, b) => b.value - a.value);
+
+    // Determine the best hand and find the kicker
+    let handDescription = '';
+    let kickerRank = '';
+    let kickerIsBoard = false;
+    let kickerPlayer: Player | null = null;
+
+    // Get all values used in pairs/trips
+    const usedValues = new Set<number>();
+    if (trips) usedValues.add(trips.value);
+    pairs.forEach(p => usedValues.add(p.value));
+
+    // Find kicker (highest card not used in pairs/trips)
+    const kickerCandidates = allCards
+      .filter(c => !usedValues.has(c.value))
+      .sort((a, b) => b.value - a.value);
+
+    if (kickerCandidates.length > 0) {
+      const kicker = kickerCandidates[0];
+      kickerRank = kicker.rank;
+      kickerIsBoard = kicker.isBoard;
+      kickerPlayer = kicker.player;
+    }
+
+    // Evaluate hand type
+    if (trips) {
+      // Three of a kind
+      const tripRank = allCards.find(c => c.value === trips!.value)?.rank || '';
+      handDescription = `Three ${tripRank}s`;
+
+      if (kickerPlayer) {
+        // Player holds the kicker - they win
+        return {
+          name: kickerPlayer.name,
+          isSplit: false,
+          reason: `${handDescription}, ${kickerRank} kicker`,
+          rollover: false
+        };
+      } else if (kickerIsBoard) {
+        // Board is kicker - trips players split
+        if (trips.players.length === 1) {
+          return {
+            name: trips.players[0].name,
+            isSplit: false,
+            reason: `${handDescription}, ${kickerRank} kicker`,
+            rollover: false
+          };
+        } else {
+          return {
+            name: trips.players.map(p => p.name).join(' & '),
+            isSplit: true,
+            players: trips.players,
+            reason: `${handDescription}, ${kickerRank} kicker`,
+            rollover: false
+          };
+        }
+      }
+    } else if (pairs.length >= 2) {
+      // Two pair
+      const pair1Rank = allCards.find(c => c.value === pairs[0].value)?.rank || '';
+      const pair2Rank = allCards.find(c => c.value === pairs[1].value)?.rank || '';
+      handDescription = `Two Pair, ${pair1Rank}s and ${pair2Rank}s`;
+
+      if (kickerPlayer) {
+        // Player holds the kicker - they win
+        return {
+          name: kickerPlayer.name,
+          isSplit: false,
+          reason: `${handDescription}, ${kickerRank} kicker`,
+          rollover: false
+        };
+      } else if (kickerIsBoard) {
+        // Board is kicker - players with highest pair split
+        const topPairPlayers = pairs[0].players;
+        if (topPairPlayers.length === 1) {
+          return {
+            name: topPairPlayers[0].name,
+            isSplit: false,
+            reason: `${handDescription}, ${kickerRank} kicker`,
+            rollover: false
+          };
+        } else if (topPairPlayers.length > 1) {
+          return {
+            name: topPairPlayers.map(p => p.name).join(' & '),
+            isSplit: true,
+            players: topPairPlayers,
+            reason: `${handDescription}, ${kickerRank} kicker`,
+            rollover: false
+          };
+        }
+      }
+    } else if (pairs.length === 1) {
+      // One pair
+      const pairRank = allCards.find(c => c.value === pairs[0].value)?.rank || '';
+      handDescription = `Pair of ${pairRank}s`;
+
+      if (kickerPlayer) {
+        // Player holds the kicker - they win
+        return {
+          name: kickerPlayer.name,
+          isSplit: false,
+          reason: `${handDescription}, ${kickerRank} kicker`,
+          rollover: false
+        };
+      } else if (kickerIsBoard) {
+        // Board is kicker - pair holders split
+        const pairPlayers = pairs[0].players;
+        if (pairPlayers.length === 1) {
+          return {
+            name: pairPlayers[0].name,
+            isSplit: false,
+            reason: `${handDescription}, ${kickerRank} kicker`,
+            rollover: false
+          };
+        } else if (pairPlayers.length > 1) {
+          return {
+            name: pairPlayers.map(p => p.name).join(' & '),
+            isSplit: true,
+            players: pairPlayers,
+            reason: `${handDescription}, ${kickerRank} kicker`,
+            rollover: false
+          };
         }
       }
     }
 
-    console.log('Total pairs found:', allPairs.length);
+    // No pairs - high card wins
+    // Find highest card
+    const sortedCards = [...allCards].sort((a, b) => b.value - a.value);
+    const highestCard = sortedCards[0];
 
-    // Find the highest pair value among all pairs
-    if (allPairs.length > 0) {
-      const highestPairValue = Math.max(...allPairs.map(p => p.value));
-      const highestPairs = allPairs.filter(p => p.value === highestPairValue);
-
-      // Get all players involved in the highest pairs
-      const pairPlayers = highestPairs.flatMap(p => p.players);
-      const uniquePairPlayers = [...new Map(pairPlayers.map(p => [p.name, p])).values()];
-
-      // Check if the winning pair is a board pair
-      const winningIsBoard = highestPairs.some(p => p.isBoard);
-
-      if (uniquePairPlayers.length === 1) {
-        return {
-          name: uniquePairPlayers[0].name,
-          isSplit: false,
-          reason: winningIsBoard
-            ? `Paired with board (${communalCard!.rank})`
-            : `Pair of ${uniquePairPlayers[0].card!.rank}s`,
-          rollover: false
-        };
-      } else {
-        return {
-          name: uniquePairPlayers.map(p => p.name).join(' & '),
-          isSplit: true,
-          players: uniquePairPlayers,
-          reason: winningIsBoard
-            ? `Paired with board (${communalCard!.rank})`
-            : `Pair of ${uniquePairPlayers[0].card!.rank}s`,
-          rollover: false
-        };
-      }
-    }
-
-    // No pairs - check high card
-    console.log('No pairs found, checking high card...');
-    const allCardValues = [boardValue, ...activePlayers.map(p => p.card!.value)];
-    const highestValue = Math.max(...allCardValues);
-    console.log('All card values:', allCardValues, 'highest:', highestValue);
-
-    if (boardValue === highestValue) {
-      console.log('Board is highest - ROLLOVER');
+    if (highestCard.isBoard) {
+      // Board is highest - rollover
       return {
         name: 'Board',
         isSplit: false,
-        reason: `Board ${communalCard!.rank} is highest`,
+        reason: `${boardRank} high - Board wins`,
         rollover: true
       };
     }
 
-    const highCardPlayers = activePlayers.filter(p => p.card!.value === highestValue);
-
+    // Player has high card
+    const highCardPlayers = activePlayers.filter(p => p.card!.value === highestCard.value);
     if (highCardPlayers.length === 1) {
       return {
         name: highCardPlayers[0].name,
         isSplit: false,
-        reason: `Highest card (${highCardPlayers[0].card!.rank})`,
+        reason: `${highestCard.rank} high`,
         rollover: false
       };
     } else {
@@ -551,7 +608,7 @@ export default function Kicker() {
         name: highCardPlayers.map(p => p.name).join(' & '),
         isSplit: true,
         players: highCardPlayers,
-        reason: `Tied high card (${highCardPlayers[0].card!.rank})`,
+        reason: `${highestCard.rank} high`,
         rollover: false
       };
     }
