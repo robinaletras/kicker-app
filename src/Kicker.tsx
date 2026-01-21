@@ -175,6 +175,7 @@ export default function Kicker() {
   const [playerNames, setPlayerNames] = useState(['Player 1', 'Player 2', 'Player 3', 'Player 4']);
   const [isPlayerAI, setIsPlayerAI] = useState([false, false, false, false]);
   const [autoAI, setAutoAI] = useState(true);
+  const [aiPendingAction, setAiPendingAction] = useState<{ action: Action; amount?: number } | null>(null);
   const [lastRaiser, setLastRaiser] = useState(-1);
   const [bettingRoundStarter, setBettingRoundStarter] = useState(0);
   const [dealer, setDealer] = useState(0);
@@ -685,11 +686,18 @@ export default function Kicker() {
 
   const { boardHighest } = getHighlightInfo();
 
-  // Function to trigger AI turn (used by both auto and manual modes)
+  // Function to trigger AI turn - shows decision first, then executes
   const triggerAITurn = () => {
     if (!currentPlayerData?.aiLevel) return;
-    const decision = makeAIDecision(currentPlayerData);
-    handleAction(decision.action, decision.amount || 0);
+    if (aiPendingAction) {
+      // Execute the pending action
+      handleAction(aiPendingAction.action, aiPendingAction.amount || 0);
+      setAiPendingAction(null);
+    } else {
+      // Compute and show the decision
+      const decision = makeAIDecision(currentPlayerData);
+      setAiPendingAction(decision);
+    }
   };
 
   // AI auto-play effect
@@ -703,18 +711,34 @@ export default function Kicker() {
     if (showPassScreen && gameState === 'passing') {
       const timer = setTimeout(() => {
         handleReady();
-      }, 800);
+      }, 1200);
       return () => clearTimeout(timer);
     }
 
     // Make AI decision when it's their turn to play
     if (gameState === 'playing' && !showPassScreen) {
-      const timer = setTimeout(() => {
-        triggerAITurn();
-      }, 1500);
-      return () => clearTimeout(timer);
+      if (!aiPendingAction) {
+        // First, compute and show the decision
+        const timer = setTimeout(() => {
+          const decision = makeAIDecision(currentPlayerData);
+          setAiPendingAction(decision);
+        }, 1000);
+        return () => clearTimeout(timer);
+      } else {
+        // Then execute it after showing the highlight
+        const timer = setTimeout(() => {
+          handleAction(aiPendingAction.action, aiPendingAction.amount || 0);
+          setAiPendingAction(null);
+        }, 1500);
+        return () => clearTimeout(timer);
+      }
     }
-  }, [gameState, currentPlayer, showPassScreen, currentPlayerData?.aiLevel, winner]);
+  }, [gameState, currentPlayer, showPassScreen, currentPlayerData?.aiLevel, winner, aiPendingAction, autoAI]);
+
+  // Clear pending action when player changes
+  useEffect(() => {
+    setAiPendingAction(null);
+  }, [currentPlayer]);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-emerald-950 to-gray-900 text-white p-4 font-sans">
@@ -908,21 +932,119 @@ export default function Kicker() {
                 )}
               </div>
 
-              {/* AI Thinking Indicator */}
+              {/* AI Actions Display */}
               {currentPlayerData.aiLevel && (
-                <div className="text-center py-6">
-                  {autoAI ? (
-                    <div className="text-cyan-400 text-lg animate-pulse">AI is thinking...</div>
-                  ) : (
-                    <div className="space-y-3">
-                      <div className="text-cyan-400 text-lg">Waiting for AI move...</div>
-                      <button
-                        onClick={triggerAITurn}
-                        className="px-8 py-3 bg-cyan-600 hover:bg-cyan-500 text-white rounded-lg font-bold transition-colors"
-                      >
-                        Next
-                      </button>
+                <div className="space-y-2">
+                  {!aiPendingAction && (
+                    <div className="text-center py-4">
+                      {autoAI ? (
+                        <div className="text-cyan-400 text-lg animate-pulse">AI is thinking...</div>
+                      ) : (
+                        <div className="space-y-3">
+                          <div className="text-cyan-400 text-lg">Waiting for AI move...</div>
+                          <button
+                            onClick={triggerAITurn}
+                            className="px-8 py-3 bg-cyan-600 hover:bg-cyan-500 text-white rounded-lg font-bold transition-colors"
+                          >
+                            Next
+                          </button>
+                        </div>
+                      )}
                     </div>
+                  )}
+
+                  {aiPendingAction && (
+                    <>
+                      <div className="text-center text-cyan-400 text-sm mb-2">
+                        {currentPlayerData.name} chooses...
+                      </div>
+
+                      {canBet && (
+                        <div>
+                          <div className="text-xs text-gray-400 mb-1 text-center">Bet</div>
+                          <div className="grid grid-cols-3 gap-2">
+                            {[1, 2, 3].map(amt => (
+                              <div
+                                key={amt}
+                                className={`px-3 py-3 rounded-lg font-bold text-center transition-all duration-300 ${
+                                  aiPendingAction.action === 'bet' && aiPendingAction.amount === amt
+                                    ? 'bg-green-400 text-gray-900 ring-4 ring-green-300 scale-110 animate-pulse'
+                                    : 'bg-green-900/50 text-green-300/50'
+                                }`}
+                              >
+                                Bet ${amt}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {canCall && (
+                        <div
+                          className={`w-full px-3 py-3 rounded-lg font-bold text-center transition-all duration-300 ${
+                            aiPendingAction.action === 'call'
+                              ? 'bg-blue-400 text-gray-900 ring-4 ring-blue-300 scale-105 animate-pulse'
+                              : 'bg-blue-900/50 text-blue-300/50'
+                          }`}
+                        >
+                          Call ${toCall}
+                        </div>
+                      )}
+
+                      {canRaise && (
+                        <div>
+                          <div className="text-xs text-gray-400 mb-1 text-center">Raise</div>
+                          <div className="grid grid-cols-3 gap-2">
+                            {[1, 2, 3].map(amt => (
+                              <div
+                                key={amt}
+                                className={`px-3 py-3 rounded-lg font-bold text-center transition-all duration-300 ${
+                                  aiPendingAction.action === 'raise' && aiPendingAction.amount === amt
+                                    ? 'bg-orange-400 text-gray-900 ring-4 ring-orange-300 scale-110 animate-pulse'
+                                    : 'bg-orange-900/50 text-orange-300/50'
+                                }`}
+                              >
+                                +${amt}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      <div className={`grid ${canCheck ? 'grid-cols-2' : 'grid-cols-1'} gap-2`}>
+                        {canCheck && (
+                          <div
+                            className={`px-3 py-3 rounded-lg font-bold text-center transition-all duration-300 ${
+                              aiPendingAction.action === 'check'
+                                ? 'bg-gray-400 text-gray-900 ring-4 ring-gray-300 scale-105 animate-pulse'
+                                : 'bg-gray-800/50 text-gray-400/50'
+                            }`}
+                          >
+                            Check
+                          </div>
+                        )}
+                        <div
+                          className={`px-3 py-3 rounded-lg font-bold text-center transition-all duration-300 ${
+                            aiPendingAction.action === 'fold'
+                              ? 'bg-red-400 text-gray-900 ring-4 ring-red-300 scale-105 animate-pulse'
+                              : 'bg-red-900/50 text-red-300/50'
+                          }`}
+                        >
+                          Fold
+                        </div>
+                      </div>
+
+                      {!autoAI && (
+                        <div className="text-center mt-4">
+                          <button
+                            onClick={triggerAITurn}
+                            className="px-8 py-3 bg-cyan-600 hover:bg-cyan-500 text-white rounded-lg font-bold transition-colors"
+                          >
+                            Execute
+                          </button>
+                        </div>
+                      )}
+                    </>
                   )}
                 </div>
               )}
