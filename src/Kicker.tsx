@@ -1296,20 +1296,22 @@ export default function Kicker() {
               )}
             </div>
 
-            {/* Your Card (for active player) */}
-            <div className="p-2 bg-amber-900/30 rounded-lg mb-2 flex-shrink-0 border border-amber-400/50">
-              <div className="flex justify-center items-center gap-3">
-                <span className="text-xs text-amber-400">Your card:</span>
-                <Card
-                  card={currentPlayerData.card}
-                  small
-                  highlight={currentPlayerData.card?.value === communalCard?.value}
-                />
-                {currentPlayerData.card?.value === communalCard?.value && (
-                  <span className="text-yellow-400 text-xs font-bold">PAIRS!</span>
-                )}
+            {/* Your Card (for human players only - hide AI cards) */}
+            {!currentPlayerData.aiLevel && (
+              <div className="p-2 bg-amber-900/30 rounded-lg mb-2 flex-shrink-0 border border-amber-400/50">
+                <div className="flex justify-center items-center gap-3">
+                  <span className="text-xs text-amber-400">Your card:</span>
+                  <Card
+                    card={currentPlayerData.card}
+                    small
+                    highlight={currentPlayerData.card?.value === communalCard?.value}
+                  />
+                  {currentPlayerData.card?.value === communalCard?.value && (
+                    <span className="text-yellow-400 text-xs font-bold">PAIRS!</span>
+                  )}
+                </div>
               </div>
-            </div>
+            )}
 
             {/* Game Board - Board card + all player cards */}
             <div className="p-2 bg-gray-900/60 rounded-lg flex-shrink-0">
