@@ -180,6 +180,19 @@ export default function Kicker() {
 
   const isAI = (name: string) => name.toLowerCase() === 'ai';
 
+  const AI_NAMES = [
+    'Alex', 'Sam', 'Jordan', 'Taylor', 'Casey',
+    'Morgan', 'Riley', 'Quinn', 'Avery', 'Blake',
+    'Charlie', 'Drew', 'Frankie', 'Jamie', 'Jesse',
+    'Kelly', 'Logan', 'Max', 'Peyton', 'Reese'
+  ];
+
+  const getRandomAIName = (usedNames: string[]): string => {
+    const available = AI_NAMES.filter(n => !usedNames.includes(n));
+    if (available.length === 0) return AI_NAMES[Math.floor(Math.random() * AI_NAMES.length)];
+    return available[Math.floor(Math.random() * available.length)];
+  };
+
   const getRandomAILevel = (): AISkillLevel => {
     const levels: AISkillLevel[] = ['cautious', 'random', 'aggressive'];
     return levels[Math.floor(Math.random() * levels.length)];
@@ -195,16 +208,26 @@ export default function Kicker() {
     }
     setRevealOrder(order);
 
-    const newPlayers = players.map((p, i) => ({
-      ...p,
-      name: playerNames[i],
-      card: newDeck.pop()!,
-      revealed: false,
-      folded: false,
-      peekedCards: [],
-      currentBet: 0,
-      aiLevel: isAI(playerNames[i]) ? getRandomAILevel() : undefined,
-    }));
+    // Assign random names to AI players
+    const usedAINames: string[] = [];
+    const newPlayers = players.map((p, i) => {
+      const isAIPlayer = isAI(playerNames[i]);
+      let name = playerNames[i];
+      if (isAIPlayer) {
+        name = getRandomAIName(usedAINames);
+        usedAINames.push(name);
+      }
+      return {
+        ...p,
+        name,
+        card: newDeck.pop()!,
+        revealed: false,
+        folded: false,
+        peekedCards: [],
+        currentBet: 0,
+        aiLevel: isAIPlayer ? getRandomAILevel() : undefined,
+      };
+    });
 
     const antePlayers = newPlayers.map(p => ({ ...p, chips: p.chips - 1 }));
 
