@@ -825,7 +825,8 @@ export default function Kicker() {
       let revealerIndex = -1;
       for (let i = 0; i < revealOrder.length; i++) {
         const idx = revealOrder[i];
-        if (!playersToUse[idx].folded && !playersToUse[idx].revealed) {
+        // Reveal ALL cards (including folded players) - they're part of the hand
+        if (!playersToUse[idx].revealed && !playersToUse[idx].eliminated) {
           revealerIndex = idx;
           break;
         }
@@ -840,7 +841,9 @@ export default function Kicker() {
       const revealedPlayers = playersToUse.map((p, i) =>
         i === revealerIndex ? { ...p, revealed: true } : p
       );
-      setMessage(`${revealedPlayers[revealerIndex].name} reveals: ${revealedPlayers[revealerIndex].card!.rank}${revealedPlayers[revealerIndex].card!.suit}`);
+      const revealer = revealedPlayers[revealerIndex];
+      const foldedNote = revealer.folded ? ' (folded)' : '';
+      setMessage(`${revealer.name} reveals: ${revealer.card!.rank}${revealer.card!.suit}${foldedNote}`);
       setPot(potToUse);
       startNextBettingRound(revealedPlayers, nextReveal);
     } else if (nextPlayer === bettingRoundStarter && currentBetToUse === 0) {
@@ -849,7 +852,8 @@ export default function Kicker() {
       let revealerIndex = -1;
       for (let i = 0; i < revealOrder.length; i++) {
         const idx = revealOrder[i];
-        if (!playersToUse[idx].folded && !playersToUse[idx].revealed) {
+        // Reveal ALL cards (including folded players) - they're part of the hand
+        if (!playersToUse[idx].revealed && !playersToUse[idx].eliminated) {
           revealerIndex = idx;
           break;
         }
@@ -864,7 +868,9 @@ export default function Kicker() {
       const revealedPlayers = playersToUse.map((p, i) =>
         i === revealerIndex ? { ...p, revealed: true } : p
       );
-      setMessage(`${revealedPlayers[revealerIndex].name} reveals: ${revealedPlayers[revealerIndex].card!.rank}${revealedPlayers[revealerIndex].card!.suit}`);
+      const revealer = revealedPlayers[revealerIndex];
+      const foldedNote = revealer.folded ? ' (folded)' : '';
+      setMessage(`${revealer.name} reveals: ${revealer.card!.rank}${revealer.card!.suit}${foldedNote}`);
       setPot(potToUse);
       startNextBettingRound(revealedPlayers, nextReveal);
     } else {
