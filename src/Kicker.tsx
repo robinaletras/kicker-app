@@ -1514,7 +1514,6 @@ export default function Kicker() {
                       <div className={`text-xs truncate max-w-[50px] ${isCurrentTurn ? 'text-amber-400 font-bold' : 'text-gray-400'}`}>
                         {p.name}
                         {idx === dealer && ' D'}
-                        {p.folded && ' X'}
                       </div>
                       <div className={`inline-block ${p.revealed ? 'ring-2 ring-cyan-400 rounded-lg' : ''}`}>
                         <Card
@@ -1524,9 +1523,18 @@ export default function Kicker() {
                           highlight={p.revealed && pairsBoard}
                         />
                       </div>
-                      {p.revealed && pairsBoard && (
-                        <div className="text-yellow-400 text-xs">PAIRS!</div>
-                      )}
+                      {/* Status under card */}
+                      <div className="text-xs mt-0.5">
+                        {p.folded ? (
+                          <span className="text-red-400">Fold</span>
+                        ) : p.revealed && pairsBoard ? (
+                          <span className="text-yellow-400">PAIRS!</span>
+                        ) : p.currentBet > 0 ? (
+                          <span className="text-emerald-400">${p.currentBet}</span>
+                        ) : (
+                          <span className="text-gray-500">-</span>
+                        )}
+                      </div>
                     </div>
                   );
                 })}
@@ -1542,16 +1550,6 @@ export default function Kicker() {
               </div>
             </div>
 
-            {/* Current Bets */}
-            {players.some(p => p.currentBet > 0) && (
-              <div className="flex justify-center gap-2 text-[10px] mt-1 flex-shrink-0">
-                {players.map((p, i) => p.currentBet > 0 && (
-                  <span key={i} className="text-gray-400">
-                    {p.name}: <span className="text-red-400">${p.currentBet}</span>
-                  </span>
-                ))}
-              </div>
-            )}
           </div>
         )}
       </div>
