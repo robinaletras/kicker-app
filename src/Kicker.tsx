@@ -25,6 +25,7 @@ interface Player {
   card: CardType | null;
   revealed: boolean;
   folded: boolean;
+  eliminated: boolean;
   peekedCards: CardType[];
   currentBet: number;
   aiLevel?: AISkillLevel;
@@ -158,10 +159,10 @@ export default function Kicker() {
   const [deck, setDeck] = useState<CardType[]>([]);
   const [communalCard, setCommunalCard] = useState<CardType | null>(null);
   const [players, setPlayers] = useState<Player[]>([
-    { name: 'Player 1', chips: 50, card: null, revealed: false, folded: false, peekedCards: [], currentBet: 0 },
-    { name: 'Player 2', chips: 50, card: null, revealed: false, folded: false, peekedCards: [], currentBet: 0 },
-    { name: 'Player 3', chips: 50, card: null, revealed: false, folded: false, peekedCards: [], currentBet: 0 },
-    { name: 'Player 4', chips: 50, card: null, revealed: false, folded: false, peekedCards: [], currentBet: 0 },
+    { name: 'Player 1', chips: 50, card: null, revealed: false, folded: false, eliminated: false, peekedCards: [], currentBet: 0 },
+    { name: 'Player 2', chips: 50, card: null, revealed: false, folded: false, eliminated: false, peekedCards: [], currentBet: 0 },
+    { name: 'Player 3', chips: 50, card: null, revealed: false, folded: false, eliminated: false, peekedCards: [], currentBet: 0 },
+    { name: 'Player 4', chips: 50, card: null, revealed: false, folded: false, eliminated: false, peekedCards: [], currentBet: 0 },
   ]);
   const [pot, setPot] = useState(0);
   const [rolloverPot, setRolloverPot] = useState(0);
@@ -227,25 +228,40 @@ export default function Kicker() {
     }
     setRevealOrder(order);
 
-    const newPlayers = players.map((p, i) => ({
-      ...p,
-      name: playerNames[i],
-      card: newDeck.pop()!,
-      revealed: false,
-      folded: false,
-      peekedCards: [],
-      currentBet: 0,
-      aiLevel: isPlayerAI[i] ? getRandomAILevel() : undefined,
-    }));
+    // Check who can afford to play (need at least 1 chip for ante)
+    const newPlayers = players.map((p, i) => {
+      const canPlay = p.chips >= 1 && !p.eliminated;
+      return {
+        ...p,
+        name: playerNames[i],
+        card: canPlay ? newDeck.pop()! : null,
+        revealed: false,
+        folded: !canPlay,
+        eliminated: p.eliminated || p.chips < 1,
+        peekedCards: [],
+        currentBet: 0,
+        aiLevel: isPlayerAI[i] ? getRandomAILevel() : undefined,
+      };
+    });
 
-    const antePlayers = newPlayers.map(p => ({ ...p, chips: p.chips - 1 }));
+    // Collect antes only from players who can play
+    const playingCount = newPlayers.filter(p => !p.eliminated && !p.folded).length;
+    const antePlayers = newPlayers.map(p =>
+      (!p.eliminated && !p.folded) ? { ...p, chips: p.chips - 1 } : p
+    );
 
-    const firstToAct = (dealer + 1) % 4;
+    // Find first non-eliminated player after dealer
+    let firstToAct = (dealer + 1) % 4;
+    let attempts = 0;
+    while ((antePlayers[firstToAct].eliminated || antePlayers[firstToAct].folded) && attempts < 4) {
+      firstToAct = (firstToAct + 1) % 4;
+      attempts++;
+    }
 
     setDeck(newDeck);
     setCommunalCard(communal);
     setPlayers(antePlayers);
-    setPot(4 + rolloverPot);
+    setPot(playingCount + rolloverPot);
     setCurrentPlayer(firstToAct);
     setCurrentBetAmount(0);
     setRevealPhase(0);
@@ -263,12 +279,12 @@ export default function Kicker() {
     setGameState('playing');
   };
 
-  const getActivePlayers = () => players.filter(p => !p.folded);
+  const getActivePlayers = () => players.filter(p => !p.folded && !p.eliminated);
 
   const findNextActivePlayer = (fromIndex: number) => {
     let next = (fromIndex + 1) % 4;
     let attempts = 0;
-    while (players[next].folded && attempts < 4) {
+    while ((players[next].folded || players[next].eliminated) && attempts < 4) {
       next = (next + 1) % 4;
       attempts++;
     }
@@ -281,10 +297,14 @@ export default function Kicker() {
     const aiLevel = player.aiLevel!;
     const toCall = currentBetAmount - player.currentBet;
     const canCheck = currentBetAmount === 0;
+    const availableChips = player.chips;
+    const canAffordCall = availableChips >= toCall;
+    const maxBet = availableChips;
+    const maxRaise = availableChips - toCall;
 
     // Get revealed cards that are higher than mine
     const revealedHigherCards = players.filter(
-      p => p.revealed && !p.folded && p.card && p.card.value > myCard.value
+      p => p.revealed && !p.folded && !p.eliminated && p.card && p.card.value > myCard.value
     );
 
     // Check if board is higher than my card
@@ -292,6 +312,15 @@ export default function Kicker() {
 
     // Check if I pair with the board
     const pairsWithBoard = communalCard && communalCard.value === myCard.value;
+
+    // If can't afford to call, must fold or go all-in
+    if (!canAffordCall && toCall > 0) {
+      // Go all-in if we have a good hand
+      if (pairsWithBoard || aiLevel === 'aggressive') {
+        return { action: 'call' }; // Will be limited to all-in by handleAction
+      }
+      return { action: 'fold' };
+    }
 
     if (aiLevel === 'cautious') {
       // Folds when a higher card is revealed or board is higher
@@ -302,7 +331,9 @@ export default function Kicker() {
       // Otherwise just call or check
       if (canCheck) return { action: 'check' };
       if (toCall > 0) return { action: 'call' };
-      return { action: 'bet', amount: 1 };
+      const betAmount = Math.min(1, maxBet);
+      if (betAmount > 0) return { action: 'bet', amount: betAmount };
+      return { action: 'check' };
     }
 
     if (aiLevel === 'random') {
@@ -310,11 +341,13 @@ export default function Kicker() {
       if (!pairsWithBoard && toCall > 0 && Math.random() < 0.3) {
         return { action: 'fold' };
       }
-      // 20% chance to bet/raise
+      // 20% chance to bet/raise if we can afford it
       if (Math.random() < 0.2) {
-        const amount = Math.floor(Math.random() * 3) + 1;
-        if (canCheck) return { action: 'bet', amount };
-        return { action: 'raise', amount };
+        const amount = Math.min(Math.floor(Math.random() * 3) + 1, canCheck ? maxBet : maxRaise);
+        if (amount > 0) {
+          if (canCheck) return { action: 'bet', amount };
+          return { action: 'raise', amount };
+        }
       }
       // Otherwise call or check
       if (canCheck) return { action: 'check' };
@@ -324,16 +357,20 @@ export default function Kicker() {
     if (aiLevel === 'aggressive') {
       // Never folds, often bets/raises
       if (pairsWithBoard) {
-        // Always raise big with board pair
-        const amount = 3;
-        if (canCheck) return { action: 'bet', amount };
-        return { action: 'raise', amount };
+        // Always raise big with board pair (limited by chips)
+        const amount = Math.min(3, canCheck ? maxBet : maxRaise);
+        if (amount > 0) {
+          if (canCheck) return { action: 'bet', amount };
+          return { action: 'raise', amount };
+        }
       }
-      // 50% chance to bet/raise
+      // 50% chance to bet/raise if we can afford it
       if (Math.random() < 0.5) {
-        const amount = Math.floor(Math.random() * 2) + 1;
-        if (canCheck) return { action: 'bet', amount };
-        return { action: 'raise', amount };
+        const amount = Math.min(Math.floor(Math.random() * 2) + 1, canCheck ? maxBet : maxRaise);
+        if (amount > 0) {
+          if (canCheck) return { action: 'bet', amount };
+          return { action: 'raise', amount };
+        }
       }
       // Otherwise call or check
       if (canCheck) return { action: 'check' };
@@ -587,29 +624,48 @@ export default function Kicker() {
   const handleAction = (action: Action, amount = 0) => {
     const player = players[currentPlayer];
     let newPot = pot;
-    const toCall = currentBetAmount - player.currentBet;
+    const toCall = Math.min(currentBetAmount - player.currentBet, player.chips);
     // Always create a fresh copy to preserve all state including revealed
     let newPlayers = players.map(p => ({ ...p }));
 
     if (action === 'bet') {
+      // Limit bet to available chips
+      const actualBet = Math.min(amount, player.chips);
+      if (actualBet <= 0) return; // Can't bet with no chips
       newPlayers = newPlayers.map((p, i) =>
-        i === currentPlayer ? { ...p, chips: p.chips - amount, currentBet: p.currentBet + amount } : p
+        i === currentPlayer ? { ...p, chips: p.chips - actualBet, currentBet: p.currentBet + actualBet } : p
       );
-      newPot = pot + amount;
-      setCurrentBetAmount(amount);
+      newPot = pot + actualBet;
+      setCurrentBetAmount(actualBet);
       setLastRaiser(currentPlayer);
-      setMessage(`${player.name} bet $${amount}`);
-      advanceToNextPlayer(newPlayers, newPot, currentPlayer, amount);
+      setMessage(`${player.name} bet $${actualBet}`);
+      advanceToNextPlayer(newPlayers, newPot, currentPlayer, actualBet);
       return;
     } else if (action === 'call') {
+      // Limit call to available chips (all-in if can't afford full call)
+      const actualCall = Math.min(toCall, player.chips);
       newPlayers = newPlayers.map((p, i) =>
-        i === currentPlayer ? { ...p, chips: p.chips - toCall, currentBet: currentBetAmount } : p
+        i === currentPlayer ? { ...p, chips: p.chips - actualCall, currentBet: p.currentBet + actualCall } : p
       );
-      newPot = pot + toCall;
-      setMessage(`${player.name} called $${toCall}`);
+      newPot = pot + actualCall;
+      setMessage(`${player.name} ${actualCall < toCall ? 'went all-in with' : 'called'} $${actualCall}`);
     } else if (action === 'raise') {
-      const totalCost = toCall + amount;
-      const newBetAmount = currentBetAmount + amount;
+      // Limit raise to available chips
+      const maxRaise = player.chips - toCall;
+      const actualRaise = Math.min(amount, maxRaise);
+      if (actualRaise <= 0) {
+        // Can't raise, just call
+        const actualCall = Math.min(toCall, player.chips);
+        newPlayers = newPlayers.map((p, i) =>
+          i === currentPlayer ? { ...p, chips: p.chips - actualCall, currentBet: p.currentBet + actualCall } : p
+        );
+        newPot = pot + actualCall;
+        setMessage(`${player.name} went all-in with $${actualCall}`);
+        advanceToNextPlayer(newPlayers, newPot);
+        return;
+      }
+      const totalCost = toCall + actualRaise;
+      const newBetAmount = currentBetAmount + actualRaise;
       newPlayers = newPlayers.map((p, i) =>
         i === currentPlayer ? { ...p, chips: p.chips - totalCost, currentBet: newBetAmount } : p
       );
@@ -646,16 +702,26 @@ export default function Kicker() {
   };
 
   const handleNextRound = () => {
+    // Eliminate players with no chips
     const resetPlayers = players.map(p => ({
       ...p,
       card: null,
       revealed: false,
       folded: false,
+      eliminated: p.eliminated || p.chips <= 0,
       peekedCards: [],
       currentBet: 0,
     }));
     setPlayers(resetPlayers);
-    setDealer((dealer + 1) % 4);
+
+    // Find next non-eliminated dealer
+    let nextDealer = (dealer + 1) % 4;
+    let attempts = 0;
+    while (resetPlayers[nextDealer].eliminated && attempts < 4) {
+      nextDealer = (nextDealer + 1) % 4;
+      attempts++;
+    }
+    setDealer(nextDealer);
     setGameState('setup');
     setShowPassScreen(false);
     setWinner(null);
@@ -853,23 +919,44 @@ export default function Kicker() {
                 <h3 className="font-semibold text-amber-400 mb-2">Chip Counts</h3>
                 <div className="grid grid-cols-4 gap-2">
                   {players.map((p, i) => (
-                    <div key={i} className={`text-center ${i === dealer ? 'ring-2 ring-amber-400 rounded-lg p-1' : ''}`}>
+                    <div key={i} className={`text-center ${p.eliminated ? 'opacity-40' : ''} ${i === dealer && !p.eliminated ? 'ring-2 ring-amber-400 rounded-lg p-1' : ''}`}>
                       <div className="text-sm text-gray-400">
                         {playerNames[i]}
                       </div>
-                      <div className="text-emerald-400 font-bold">${p.chips}</div>
+                      {p.eliminated ? (
+                        <div className="text-red-400 font-bold text-xs">OUT</div>
+                      ) : (
+                        <div className="text-emerald-400 font-bold">${p.chips}</div>
+                      )}
                     </div>
                   ))}
                 </div>
               </div>
             )}
 
-            <button
-              onClick={dealCards}
-              className="w-full px-8 py-4 bg-gradient-to-r from-amber-500 to-yellow-400 text-gray-900 rounded-xl font-bold text-lg shadow-lg hover:from-amber-400 hover:to-yellow-300 transition-all"
-            >
-              Deal Cards {rolloverPot > 0 && `(+$${rolloverPot} rollover)`}
-            </button>
+            {/* Check for game winner */}
+            {(() => {
+              const activePlayers = players.filter(p => !p.eliminated && p.chips > 0);
+              if (activePlayers.length <= 1 && players.some(p => p.eliminated)) {
+                const gameWinner = activePlayers[0];
+                return (
+                  <div className="p-4 bg-amber-900/60 rounded-xl border-2 border-amber-400 text-center mb-4">
+                    <h2 className="font-display text-2xl text-amber-400 mb-2">Game Over!</h2>
+                    <p className="text-xl text-white">{gameWinner?.name || 'No one'} wins with ${gameWinner?.chips || 0}!</p>
+                  </div>
+                );
+              }
+              return null;
+            })()}
+
+            {players.filter(p => !p.eliminated && p.chips > 0).length > 1 && (
+              <button
+                onClick={dealCards}
+                className="w-full px-8 py-4 bg-gradient-to-r from-amber-500 to-yellow-400 text-gray-900 rounded-xl font-bold text-lg shadow-lg hover:from-amber-400 hover:to-yellow-300 transition-all"
+              >
+                Deal Cards {rolloverPot > 0 && `(+$${rolloverPot} rollover)`}
+              </button>
+            )}
 
             <div className="p-4 bg-gray-900/60 rounded-xl border border-gray-800">
               <h3 className="font-display text-lg text-amber-400 mb-2">How to Win</h3>
@@ -1176,6 +1263,16 @@ export default function Kicker() {
               <div className="text-xs text-gray-500 text-center mb-2">Revealed Cards</div>
               <div className="flex justify-center gap-4">
                 {players.map((p, idx) => {
+                  if (p.eliminated) {
+                    return (
+                      <div key={idx} className="text-center opacity-30">
+                        <div className="text-xs mb-1 text-gray-500">{p.name}</div>
+                        <div className="w-12 h-16 rounded-lg bg-gray-800 flex items-center justify-center">
+                          <span className="text-red-400 text-xs font-bold">OUT</span>
+                        </div>
+                      </div>
+                    );
+                  }
                   const isCurrentTurn = idx === currentPlayer;
                   const pairsBoard = p.card?.value === communalCard?.value;
 
