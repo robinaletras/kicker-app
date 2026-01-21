@@ -62,8 +62,8 @@ const Card = ({ card, faceDown = false, small = false, highlight = false }: Card
 
   if (faceDown) {
     return (
-      <div className={`${small ? 'w-12 h-16' : 'w-24 h-32'} rounded-lg bg-gradient-to-br from-emerald-800 to-emerald-950 border-2 border-emerald-600 flex items-center justify-center shadow-lg`}>
-        <div className="text-emerald-400 text-3xl font-bold">K</div>
+      <div className={`${small ? 'w-8 h-11' : 'w-12 h-16'} rounded bg-gradient-to-br from-emerald-800 to-emerald-950 border border-emerald-600 flex items-center justify-center shadow`}>
+        <div className={`text-emerald-400 ${small ? 'text-sm' : 'text-lg'} font-bold`}>K</div>
       </div>
     );
   }
@@ -71,11 +71,11 @@ const Card = ({ card, faceDown = false, small = false, highlight = false }: Card
   if (!card) return null;
 
   return (
-    <div className={`${small ? 'w-12 h-16' : 'w-24 h-32'} rounded-lg bg-white border-3 ${highlight ? 'border-yellow-400 ring-4 ring-yellow-400/50' : 'border-gray-300'} flex flex-col items-center justify-center shadow-lg transition-all duration-300`}>
-      <span className={`${small ? 'text-lg' : 'text-3xl'} font-bold ${isRed ? 'text-red-600' : 'text-gray-900'}`}>
+    <div className={`${small ? 'w-8 h-11' : 'w-12 h-16'} rounded bg-white border ${highlight ? 'border-yellow-400 ring-1 ring-yellow-400/50' : 'border-gray-300'} flex flex-col items-center justify-center shadow transition-all duration-300`}>
+      <span className={`${small ? 'text-xs' : 'text-base'} font-bold leading-none ${isRed ? 'text-red-600' : 'text-gray-900'}`}>
         {card.rank}
       </span>
-      <span className={`${small ? 'text-xl' : 'text-4xl'} ${isRed ? 'text-red-600' : 'text-gray-900'}`}>
+      <span className={`${small ? 'text-sm' : 'text-lg'} leading-none ${isRed ? 'text-red-600' : 'text-gray-900'}`}>
         {card.suit}
       </span>
     </div>
@@ -89,12 +89,12 @@ interface PassScreenProps {
 
 const PassScreen = ({ playerName, onReady }: PassScreenProps) => (
   <div className="fixed inset-0 bg-gray-900 flex flex-col items-center justify-center z-50">
-    <div className="text-center p-8">
-      <h2 className="font-display text-4xl text-amber-400 mb-6">Pass to {playerName}</h2>
-      <p className="text-gray-400 mb-8 text-lg">Hand the device to {playerName}</p>
+    <div className="text-center p-4">
+      <h2 className="font-display text-2xl text-amber-400 mb-3">Pass to {playerName}</h2>
+      <p className="text-gray-400 mb-4 text-sm">Hand the device to {playerName}</p>
       <button
         onClick={onReady}
-        className="px-12 py-6 bg-gradient-to-r from-emerald-600 to-emerald-500 text-white rounded-xl font-bold text-xl shadow-lg hover:from-emerald-500 hover:to-emerald-400 transition-all transform hover:scale-105"
+        className="px-8 py-3 bg-gradient-to-r from-emerald-600 to-emerald-500 text-white rounded-xl font-bold text-base shadow-lg hover:from-emerald-500 hover:to-emerald-400 transition-all"
       >
         I'm {playerName} - Show My Card
       </button>
@@ -112,38 +112,38 @@ interface WinnerScreenProps {
 
 const WinnerScreen = ({ winner, pot, players, onNextRound, rollover }: WinnerScreenProps) => (
   <div className="fixed inset-0 bg-gray-900/95 flex flex-col items-center justify-center z-50">
-    <div className="text-center p-8 max-w-md">
+    <div className="text-center p-4 max-w-sm">
       {rollover ? (
         <>
-          <h2 className="font-display text-4xl text-purple-400 mb-4">The Board was the best Kicker!</h2>
-          <p className="text-3xl text-amber-400 mb-8">${pot} rolls over to next round</p>
+          <h2 className="font-display text-xl text-purple-400 mb-2">The Board was the best Kicker!</h2>
+          <p className="text-xl text-amber-400 mb-4">${pot} rolls over to next round</p>
         </>
       ) : (
         <>
-          <h2 className="font-display text-4xl text-amber-400 mb-4">
+          <h2 className="font-display text-xl text-amber-400 mb-2">
             {winner.isSplit ? `${winner.name} were the best Kickers!` : `${winner.name} was the best Kicker!`}
           </h2>
-          <p className="text-lg text-gray-400 mb-2">{winner.reason}</p>
-          <p className="text-3xl text-emerald-400 mb-8">${pot} pot</p>
+          <p className="text-sm text-gray-400 mb-1">{winner.reason}</p>
+          <p className="text-xl text-emerald-400 mb-4">${pot} pot</p>
         </>
       )}
 
-      <div className="grid grid-cols-2 gap-4 mb-8">
+      <div className="grid grid-cols-4 gap-2 mb-4">
         {players.map((p, i) => (
-          <div key={i} className={`p-4 rounded-lg ${p.folded ? 'bg-gray-800 opacity-50' : 'bg-gray-800'}`}>
-            <div className="font-semibold text-white mb-2">{p.name}</div>
+          <div key={i} className={`p-2 rounded-lg ${p.folded ? 'bg-gray-800 opacity-50' : 'bg-gray-800'}`}>
+            <div className="font-semibold text-white text-xs mb-1 truncate">{p.name}</div>
             <div className="flex justify-center">
               <Card card={p.card} small />
             </div>
-            <div className="mt-2 text-emerald-400">${p.chips}</div>
-            {p.folded && <div className="text-red-400 text-sm">Folded</div>}
+            <div className="mt-1 text-emerald-400 text-xs">${p.chips}</div>
+            {p.folded && <div className="text-red-400 text-xs">Folded</div>}
           </div>
         ))}
       </div>
 
       <button
         onClick={onNextRound}
-        className="px-12 py-6 bg-gradient-to-r from-amber-500 to-yellow-400 text-gray-900 rounded-xl font-bold text-xl shadow-lg hover:from-amber-400 hover:to-yellow-300 transition-all transform hover:scale-105"
+        className="px-8 py-3 bg-gradient-to-r from-amber-500 to-yellow-400 text-gray-900 rounded-xl font-bold text-base shadow-lg hover:from-amber-400 hover:to-yellow-300 transition-all"
       >
         Next Round
       </button>
@@ -383,8 +383,9 @@ export default function Kicker() {
     return { action: 'call' };
   };
 
-  const determineWinner = (): Winner => {
-    const activePlayers = getActivePlayers();
+  const determineWinner = (playersToCheck?: Player[]): Winner => {
+    const playerList = playersToCheck || players;
+    const activePlayers = playerList.filter(p => !p.folded && !p.eliminated);
 
     if (activePlayers.length === 1) {
       return {
@@ -482,7 +483,7 @@ export default function Kicker() {
   const endRound = (finalPot?: number, finalPlayers?: Player[]) => {
     const playersToUse = finalPlayers || players;
     const potToUse = finalPot !== undefined ? finalPot : pot;
-    const winnerResult = determineWinner();
+    const winnerResult = determineWinner(playersToUse);
 
     if (winnerResult.rollover) {
       setRolloverPot(potToUse);
@@ -544,7 +545,7 @@ export default function Kicker() {
   const advanceToNextPlayer = (updatedPlayers?: Player[], updatedPot?: number, newLastRaiser?: number, newCurrentBet?: number) => {
     const playersToUse = updatedPlayers || players;
     const potToUse = updatedPot !== undefined ? updatedPot : pot;
-    const activePlayers = playersToUse.filter(p => !p.folded);
+    const activePlayers = playersToUse.filter(p => !p.folded && !p.eliminated);
     const lastRaiserToUse = newLastRaiser !== undefined ? newLastRaiser : lastRaiser;
     const currentBetToUse = newCurrentBet !== undefined ? newCurrentBet : currentBetAmount;
 
@@ -813,7 +814,7 @@ export default function Kicker() {
   }, [currentPlayer]);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-emerald-950 to-gray-900 text-white p-4 font-sans">
+    <div className="h-dvh bg-gradient-to-br from-gray-900 via-emerald-950 to-gray-900 text-white p-2 font-sans overflow-hidden flex flex-col">
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700&family=Source+Sans+Pro:wght@400;600;700&display=swap');
         .font-display { font-family: 'Playfair Display', serif; }
@@ -824,15 +825,15 @@ export default function Kicker() {
         players[currentPlayer]?.aiLevel ? (
           // AI player pass screen
           <div className="fixed inset-0 bg-gray-900 flex flex-col items-center justify-center z-50">
-            <div className="text-center p-8">
-              <h2 className="font-display text-4xl text-cyan-400 mb-6">{players[currentPlayer].name}'s Turn</h2>
-              <p className="text-gray-400 mb-2 text-lg">({players[currentPlayer].aiLevel} AI)</p>
+            <div className="text-center p-4">
+              <h2 className="font-display text-2xl text-cyan-400 mb-2">{players[currentPlayer].name}'s Turn</h2>
+              <p className="text-gray-400 mb-1 text-sm">({players[currentPlayer].aiLevel} AI)</p>
               {autoAI ? (
-                <p className="text-cyan-400 animate-pulse text-lg mt-8">Starting turn...</p>
+                <p className="text-cyan-400 animate-pulse text-sm mt-4">Starting turn...</p>
               ) : (
                 <button
                   onClick={handleReady}
-                  className="mt-8 px-12 py-6 bg-gradient-to-r from-cyan-600 to-cyan-500 text-white rounded-xl font-bold text-xl shadow-lg hover:from-cyan-500 hover:to-cyan-400 transition-all transform hover:scale-105"
+                  className="mt-4 px-8 py-3 bg-gradient-to-r from-cyan-600 to-cyan-500 text-white rounded-xl font-bold text-base shadow-lg hover:from-cyan-500 hover:to-cyan-400 transition-all"
                 >
                   Next
                 </button>
@@ -854,22 +855,22 @@ export default function Kicker() {
         />
       )}
 
-      <div className="max-w-lg mx-auto">
+      <div className="max-w-md mx-auto flex-1 flex flex-col overflow-hidden">
         {/* Header */}
-        <div className="text-center mb-4">
-          <h1 className="font-display text-4xl bg-gradient-to-r from-amber-400 to-yellow-200 bg-clip-text text-transparent">
+        <div className="text-center mb-1 flex-shrink-0">
+          <h1 className="font-display text-xl bg-gradient-to-r from-amber-400 to-yellow-200 bg-clip-text text-transparent">
             KICKER
           </h1>
           {rolloverPot > 0 && gameState === 'setup' && (
-            <div className="text-purple-400 font-bold mt-1">+${rolloverPot} rollover in pot!</div>
+            <div className="text-purple-400 font-bold text-xs">+${rolloverPot} rollover!</div>
           )}
         </div>
 
         {gameState === 'setup' && (
-          <div className="space-y-4">
-            <div className="p-4 bg-gray-900/80 rounded-xl">
-              <h3 className="font-semibold text-amber-400 mb-3">Player Names</h3>
-              <div className="grid grid-cols-2 gap-3">
+          <div className="flex-1 flex flex-col gap-2 overflow-hidden">
+            <div className="p-2 bg-gray-900/80 rounded-xl flex-shrink-0">
+              <h3 className="font-semibold text-amber-400 mb-1 text-xs">Player Names</h3>
+              <div className="grid grid-cols-2 gap-1.5">
                 {playerNames.map((name, i) => (
                   <div key={i} className="relative">
                     <input
@@ -896,43 +897,37 @@ export default function Kicker() {
                           setPlayerNames(newNames);
                         }
                       }}
-                      className={`w-full px-3 py-2 bg-gray-800 border rounded-lg text-white ${isPlayerAI[i] ? 'border-cyan-400' : i === dealer ? 'border-amber-400' : 'border-gray-700'}`}
+                      className={`w-full px-2 py-1 bg-gray-800 border rounded text-white text-xs ${isPlayerAI[i] ? 'border-cyan-400' : i === dealer ? 'border-amber-400' : 'border-gray-700'}`}
                       placeholder={`Player ${i + 1}`}
                     />
                     {isPlayerAI[i] && (
-                      <span className="absolute -top-2 -left-2 bg-cyan-500 text-gray-900 text-xs font-bold px-2 py-0.5 rounded-full">
+                      <span className="absolute -top-1.5 -left-1 bg-cyan-500 text-gray-900 text-[10px] font-bold px-1.5 py-0 rounded-full">
                         AI
                       </span>
                     )}
                     {i === dealer && (
-                      <span className="absolute -top-2 -right-2 bg-amber-500 text-gray-900 text-xs font-bold px-2 py-0.5 rounded-full">
-                        DEALER
+                      <span className="absolute -top-1.5 -right-1 bg-amber-500 text-gray-900 text-[10px] font-bold px-1 py-0 rounded-full">
+                        D
                       </span>
                     )}
                   </div>
                 ))}
               </div>
-              <div className="mt-3 text-center text-sm text-gray-400">
-                {playerNames[dealer]} is the dealer
-              </div>
-              <div className="mt-2 text-center text-xs text-cyan-400">
-                Type "AI" for computer players
+              <div className="mt-1 text-center text-[10px] text-gray-400">
+                {playerNames[dealer]} deals • Type "AI" for bots
               </div>
             </div>
 
             {players[0].chips !== 50 && (
-              <div className="p-4 bg-gray-900/80 rounded-xl">
-                <h3 className="font-semibold text-amber-400 mb-2">Chip Counts</h3>
-                <div className="grid grid-cols-4 gap-2">
+              <div className="p-2 bg-gray-900/80 rounded-xl">
+                <div className="grid grid-cols-4 gap-1">
                   {players.map((p, i) => (
-                    <div key={i} className={`text-center ${p.eliminated ? 'opacity-40' : ''} ${i === dealer && !p.eliminated ? 'ring-2 ring-amber-400 rounded-lg p-1' : ''}`}>
-                      <div className="text-sm text-gray-400">
-                        {playerNames[i]}
-                      </div>
+                    <div key={i} className={`text-center ${p.eliminated ? 'opacity-40' : ''} ${i === dealer && !p.eliminated ? 'ring-1 ring-amber-400 rounded p-0.5' : ''}`}>
+                      <div className="text-xs text-gray-400 truncate">{playerNames[i]}</div>
                       {p.eliminated ? (
                         <div className="text-red-400 font-bold text-xs">OUT</div>
                       ) : (
-                        <div className="text-emerald-400 font-bold">${p.chips}</div>
+                        <div className="text-emerald-400 font-bold text-sm">${p.chips}</div>
                       )}
                     </div>
                   ))}
@@ -946,9 +941,9 @@ export default function Kicker() {
               if (activePlayers.length <= 1 && players.some(p => p.eliminated)) {
                 const gameWinner = activePlayers[0];
                 return (
-                  <div className="p-4 bg-amber-900/60 rounded-xl border-2 border-amber-400 text-center mb-4">
-                    <h2 className="font-display text-2xl text-amber-400 mb-2">Game Over!</h2>
-                    <p className="text-xl text-white">{gameWinner?.name || 'No one'} wins with ${gameWinner?.chips || 0}!</p>
+                  <div className="p-3 bg-amber-900/60 rounded-xl border-2 border-amber-400 text-center">
+                    <h2 className="font-display text-xl text-amber-400">Game Over!</h2>
+                    <p className="text-lg text-white">{gameWinner?.name || 'No one'} wins with ${gameWinner?.chips || 0}!</p>
                   </div>
                 );
               }
@@ -958,177 +953,149 @@ export default function Kicker() {
             {players.filter(p => !p.eliminated && p.chips > 0).length > 1 && (
               <button
                 onClick={dealCards}
-                className="w-full px-8 py-4 bg-gradient-to-r from-amber-500 to-yellow-400 text-gray-900 rounded-xl font-bold text-lg shadow-lg hover:from-amber-400 hover:to-yellow-300 transition-all"
+                className="w-full px-3 py-2 bg-gradient-to-r from-amber-500 to-yellow-400 text-gray-900 rounded-lg font-bold text-sm shadow-lg hover:from-amber-400 hover:to-yellow-300 transition-all"
               >
-                Deal Cards {rolloverPot > 0 && `(+$${rolloverPot} rollover)`}
+                Deal Cards {rolloverPot > 0 && `(+$${rolloverPot})`}
               </button>
             )}
 
-            <div className="p-4 bg-gray-900/60 rounded-xl border border-gray-800">
-              <h3 className="font-display text-lg text-amber-400 mb-2">How to Win</h3>
-              <ul className="text-sm text-gray-400 space-y-1 font-body">
-                <li><span className="text-yellow-400">Pair with board</span> = Best hand</li>
-                <li><span className="text-blue-400">Pair with another player</span> = Second best</li>
-                <li><span className="text-gray-300">Highest card</span> = Third best</li>
-                <li><span className="text-purple-400">Board is highest?</span> = Pot rolls over!</li>
-                <li>Ties broken by kicker, else split pot</li>
+            <div className="p-2 bg-gray-900/60 rounded-xl border border-gray-800">
+              <h3 className="font-display text-sm text-amber-400 mb-1">How to Win</h3>
+              <ul className="text-xs text-gray-400 space-y-0.5 font-body">
+                <li><span className="text-yellow-400">Pair with board</span> = Best</li>
+                <li><span className="text-blue-400">Pair with player</span> = 2nd</li>
+                <li><span className="text-gray-300">Highest card</span> = 3rd</li>
+                <li><span className="text-purple-400">Board highest</span> = Rollover</li>
               </ul>
             </div>
           </div>
         )}
 
         {gameState === 'playing' && (
-          <>
+          <div className="flex-1 flex flex-col overflow-hidden">
             {/* Game Info */}
-            <div className="flex justify-between items-center mb-4 p-3 bg-gray-900/80 rounded-xl border border-emerald-800">
+            <div className="flex justify-between items-center mb-1 px-2 py-1 bg-gray-900/80 rounded-lg border border-emerald-800 flex-shrink-0">
               <div className="text-center">
-                <div className="text-xs text-gray-400">Pot</div>
-                <div className="text-xl font-bold text-amber-400">${pot}</div>
+                <div className="text-[10px] text-gray-400">Pot</div>
+                <div className="text-base font-bold text-amber-400">${pot}</div>
               </div>
               <div className="text-center">
-                <div className="text-xs text-gray-400">Current Bet</div>
-                <div className="text-xl font-bold text-red-400">${currentBetAmount}</div>
+                <div className="text-[10px] text-gray-400">Bet</div>
+                <div className="text-base font-bold text-red-400">${currentBetAmount}</div>
               </div>
               <div className="text-center">
-                <div className="text-xs text-gray-400">To Call</div>
-                <div className="text-xl font-bold text-blue-400">${toCall}</div>
+                <div className="text-[10px] text-gray-400">Call</div>
+                <div className="text-base font-bold text-blue-400">${toCall}</div>
               </div>
             </div>
 
             {/* AI Controls */}
             {players.some(p => p.aiLevel) && (
-              <div className="flex justify-center items-center gap-4 mb-3">
+              <div className="flex justify-center items-center gap-2 mb-1 flex-shrink-0">
                 <button
                   onClick={() => setAutoAI(!autoAI)}
-                  className={`px-4 py-1 rounded-full text-sm font-medium transition-colors ${
-                    autoAI
-                      ? 'bg-cyan-600 text-white'
-                      : 'bg-gray-700 text-gray-300'
+                  className={`px-3 py-0.5 rounded-full text-xs font-medium transition-colors ${
+                    autoAI ? 'bg-cyan-600 text-white' : 'bg-gray-700 text-gray-300'
                   }`}
                 >
-                  AI: {autoAI ? 'Auto' : 'Manual'}
+                  {autoAI ? 'Auto' : 'Manual'}
                 </button>
-
-                {/* Speed Controls */}
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-1">
                   <button
                     onClick={() => setAiSpeed(Math.max(0.25, aiSpeed - 0.25))}
-                    className="w-8 h-8 rounded-full bg-gray-700 hover:bg-gray-600 text-white font-bold transition-colors"
-                  >
-                    -
-                  </button>
-                  <span className="text-xs text-gray-400 w-12 text-center">
-                    {aiSpeed === 0.25 ? 'Fast' : aiSpeed === 0.5 ? '2x' : aiSpeed === 0.75 ? '1.5x' : aiSpeed === 1 ? '1x' : aiSpeed === 1.5 ? '0.7x' : '0.5x'}
+                    className="w-6 h-6 rounded-full bg-gray-700 hover:bg-gray-600 text-white text-sm font-bold"
+                  >-</button>
+                  <span className="text-xs text-gray-400 w-8 text-center">
+                    {aiSpeed === 0.25 ? '4x' : aiSpeed === 0.5 ? '2x' : aiSpeed === 0.75 ? '1.3x' : aiSpeed === 1 ? '1x' : aiSpeed === 1.5 ? '.7x' : '.5x'}
                   </span>
                   <button
                     onClick={() => setAiSpeed(Math.min(2, aiSpeed + 0.25))}
-                    className="w-8 h-8 rounded-full bg-gray-700 hover:bg-gray-600 text-white font-bold transition-colors"
-                  >
-                    +
-                  </button>
+                    className="w-6 h-6 rounded-full bg-gray-700 hover:bg-gray-600 text-white text-sm font-bold"
+                  >+</button>
                 </div>
               </div>
             )}
 
-            <div className="text-center mb-3 text-sm text-gray-300">{message}</div>
+            <div className="text-center mb-1 text-[10px] text-gray-300 flex-shrink-0">{message}</div>
 
             {/* Current Player Actions */}
-            <div className="p-4 bg-amber-900/40 rounded-xl border-2 border-amber-400 mb-4">
-              <div className="text-center mb-3">
-                <span className="text-amber-400 font-bold text-xl">{currentPlayerData.name}'s Turn</span>
+            <div className="p-1.5 bg-amber-900/40 rounded-lg border border-amber-400 mb-1 flex-shrink-0">
+              <div className="text-center mb-1">
+                <span className="text-amber-400 font-bold text-sm">{currentPlayerData.name}'s Turn</span>
                 {currentPlayerData.aiLevel && (
-                  <span className="text-cyan-400 ml-2 text-sm">({currentPlayerData.aiLevel} AI)</span>
+                  <span className="text-cyan-400 ml-1 text-xs">({currentPlayerData.aiLevel})</span>
                 )}
                 {currentPlayerData.currentBet > 0 && (
-                  <span className="text-gray-400 ml-2">(bet: ${currentPlayerData.currentBet})</span>
+                  <span className="text-gray-400 ml-1 text-xs">(${currentPlayerData.currentBet})</span>
                 )}
               </div>
 
               {/* AI Actions Display */}
               {currentPlayerData.aiLevel && (
-                <div className="space-y-2">
+                <div className="space-y-1">
                   {!aiPendingAction && (
-                    <div className="text-center py-4">
+                    <div className="text-center py-1">
                       {autoAI ? (
-                        <div className="text-cyan-400 text-lg animate-pulse">AI is thinking...</div>
+                        <div className="text-cyan-400 text-xs animate-pulse">AI thinking...</div>
                       ) : (
-                        <div className="space-y-3">
-                          <div className="text-cyan-400 text-lg">Waiting for AI move...</div>
-                          <button
-                            onClick={triggerAITurn}
-                            className="px-8 py-3 bg-cyan-600 hover:bg-cyan-500 text-white rounded-lg font-bold transition-colors"
-                          >
-                            Next
-                          </button>
-                        </div>
+                        <button onClick={triggerAITurn} className="px-4 py-1 bg-cyan-600 hover:bg-cyan-500 text-white rounded font-bold text-xs">
+                          Next
+                        </button>
                       )}
                     </div>
                   )}
 
                   {aiPendingAction && (
                     <>
-                      <div className="text-center text-cyan-400 text-sm mb-2">
-                        {currentPlayerData.name} chooses...
-                      </div>
+                      <div className="text-center text-cyan-400 text-[10px]">{currentPlayerData.name} chooses...</div>
 
                       {canBet && (
-                        <div>
-                          <div className="text-xs text-gray-400 mb-1 text-center">Bet</div>
-                          <div className="grid grid-cols-3 gap-2">
-                            {[1, 2, 3].map(amt => (
-                              <div
-                                key={amt}
-                                className={`px-3 py-3 rounded-lg font-bold text-center transition-all duration-300 ${
-                                  aiPendingAction.action === 'bet' && aiPendingAction.amount === amt
-                                    ? 'bg-green-400 text-gray-900 ring-4 ring-green-300 scale-110 animate-pulse'
-                                    : 'bg-green-900/50 text-green-300/50'
-                                }`}
-                              >
-                                Bet ${amt}
-                              </div>
-                            ))}
-                          </div>
+                        <div className="grid grid-cols-3 gap-1">
+                          {[1, 2, 3].map(amt => (
+                            <div key={amt} className={`px-1 py-1 rounded text-xs font-bold text-center transition-all duration-300 ${
+                              aiPendingAction.action === 'bet' && aiPendingAction.amount === amt
+                                ? 'bg-green-400 text-gray-900 ring-1 ring-green-300 animate-pulse'
+                                : 'bg-green-900/50 text-green-300/50'
+                            }`}>
+                              ${amt}
+                            </div>
+                          ))}
                         </div>
                       )}
 
                       {canCall && (
-                        <div
-                          className={`w-full px-3 py-3 rounded-lg font-bold text-center transition-all duration-300 ${
-                            aiPendingAction.action === 'call'
-                              ? 'bg-blue-400 text-gray-900 ring-4 ring-blue-300 scale-105 animate-pulse'
-                              : 'bg-blue-900/50 text-blue-300/50'
-                          }`}
-                        >
+                        <div className={`w-full px-1 py-1 rounded text-xs font-bold text-center transition-all duration-300 ${
+                          aiPendingAction.action === 'call'
+                            ? 'bg-blue-400 text-gray-900 ring-1 ring-blue-300 animate-pulse'
+                            : 'bg-blue-900/50 text-blue-300/50'
+                        }`}>
                           Call ${toCall}
                         </div>
                       )}
 
                       {canRaise && (
-                        <div>
-                          <div className="text-xs text-gray-400 mb-1 text-center">Raise</div>
-                          <div className="grid grid-cols-3 gap-2">
-                            {[1, 2, 3].map(amt => (
-                              <div
-                                key={amt}
-                                className={`px-3 py-3 rounded-lg font-bold text-center transition-all duration-300 ${
-                                  aiPendingAction.action === 'raise' && aiPendingAction.amount === amt
-                                    ? 'bg-orange-400 text-gray-900 ring-4 ring-orange-300 scale-110 animate-pulse'
-                                    : 'bg-orange-900/50 text-orange-300/50'
-                                }`}
-                              >
-                                +${amt}
-                              </div>
-                            ))}
-                          </div>
+                        <div className="grid grid-cols-3 gap-1">
+                          {[1, 2, 3].map(amt => (
+                            <div
+                              key={amt}
+                              className={`px-1 py-1 rounded text-xs font-bold text-center transition-all duration-300 ${
+                                aiPendingAction.action === 'raise' && aiPendingAction.amount === amt
+                                  ? 'bg-orange-400 text-gray-900 ring-1 ring-orange-300 animate-pulse'
+                                  : 'bg-orange-900/50 text-orange-300/50'
+                              }`}
+                            >
+                              +${amt}
+                            </div>
+                          ))}
                         </div>
                       )}
 
-                      <div className={`grid ${canCheck ? 'grid-cols-2' : 'grid-cols-1'} gap-2`}>
+                      <div className={`grid ${canCheck ? 'grid-cols-2' : 'grid-cols-1'} gap-1`}>
                         {canCheck && (
                           <div
-                            className={`px-3 py-3 rounded-lg font-bold text-center transition-all duration-300 ${
+                            className={`px-1 py-1 rounded text-xs font-bold text-center transition-all duration-300 ${
                               aiPendingAction.action === 'check'
-                                ? 'bg-gray-400 text-gray-900 ring-4 ring-gray-300 scale-105 animate-pulse'
+                                ? 'bg-gray-400 text-gray-900 ring-1 ring-gray-300 animate-pulse'
                                 : 'bg-gray-800/50 text-gray-400/50'
                             }`}
                           >
@@ -1136,9 +1103,9 @@ export default function Kicker() {
                           </div>
                         )}
                         <div
-                          className={`px-3 py-3 rounded-lg font-bold text-center transition-all duration-300 ${
+                          className={`px-1 py-1 rounded text-xs font-bold text-center transition-all duration-300 ${
                             aiPendingAction.action === 'fold'
-                              ? 'bg-red-400 text-gray-900 ring-4 ring-red-300 scale-105 animate-pulse'
+                              ? 'bg-red-400 text-gray-900 ring-1 ring-red-300 animate-pulse'
                               : 'bg-red-900/50 text-red-300/50'
                           }`}
                         >
@@ -1147,10 +1114,10 @@ export default function Kicker() {
                       </div>
 
                       {!autoAI && (
-                        <div className="text-center mt-4">
+                        <div className="text-center mt-1">
                           <button
                             onClick={triggerAITurn}
-                            className="px-8 py-3 bg-cyan-600 hover:bg-cyan-500 text-white rounded-lg font-bold transition-colors"
+                            className="px-4 py-1 bg-cyan-600 hover:bg-cyan-500 text-white rounded font-bold text-xs transition-colors"
                           >
                             Execute
                           </button>
@@ -1166,9 +1133,9 @@ export default function Kicker() {
                 <>
                   {/* Peeked Cards */}
                   {currentPlayerData.peekedCards.length > 0 && (
-                    <div className="mb-4">
-                      <div className="text-xs text-gray-400 mb-1 text-center">Your Peeked Cards</div>
-                      <div className="flex gap-2 justify-center">
+                    <div className="mb-1">
+                      <div className="text-[10px] text-gray-400 text-center">Peeked</div>
+                      <div className="flex gap-1 justify-center">
                         {currentPlayerData.peekedCards.map((card, i) => (
                           <Card key={i} card={card} small />
                         ))}
@@ -1177,77 +1144,71 @@ export default function Kicker() {
                   )}
 
                   {/* Actions */}
-                  <div className="space-y-2">
+                  <div className="space-y-1">
                 {canBet && (
-                  <div>
-                    <div className="text-xs text-gray-400 mb-1 text-center">Bet</div>
-                    <div className="grid grid-cols-3 gap-2">
-                      <button onClick={() => handleAction('bet', 1)} className="px-3 py-3 bg-green-600 hover:bg-green-500 rounded-lg font-bold transition-colors">
-                        Bet $1
-                      </button>
-                      <button onClick={() => handleAction('bet', 2)} className="px-3 py-3 bg-green-600 hover:bg-green-500 rounded-lg font-bold transition-colors">
-                        Bet $2
-                      </button>
-                      <button onClick={() => handleAction('bet', 3)} className="px-3 py-3 bg-green-600 hover:bg-green-500 rounded-lg font-bold transition-colors">
-                        Bet $3
-                      </button>
-                    </div>
+                  <div className="grid grid-cols-3 gap-1">
+                    <button onClick={() => handleAction('bet', 1)} className="px-1 py-1 bg-green-600 hover:bg-green-500 rounded text-xs font-bold transition-colors">
+                      Bet $1
+                    </button>
+                    <button onClick={() => handleAction('bet', 2)} className="px-1 py-1 bg-green-600 hover:bg-green-500 rounded text-xs font-bold transition-colors">
+                      Bet $2
+                    </button>
+                    <button onClick={() => handleAction('bet', 3)} className="px-1 py-1 bg-green-600 hover:bg-green-500 rounded text-xs font-bold transition-colors">
+                      Bet $3
+                    </button>
                   </div>
                 )}
 
                 {canCall && (
                   <button
                     onClick={() => handleAction('call')}
-                    className="w-full px-3 py-3 bg-blue-600 hover:bg-blue-500 rounded-lg font-bold transition-colors"
+                    className="w-full px-1 py-1 bg-blue-600 hover:bg-blue-500 rounded text-xs font-bold transition-colors"
                   >
                     Call ${toCall}
                   </button>
                 )}
 
                 {canRaise && (
-                  <div>
-                    <div className="text-xs text-gray-400 mb-1 text-center">Raise (call ${toCall} + raise)</div>
-                    <div className="grid grid-cols-3 gap-2">
-                      <button
-                        onClick={() => handleAction('raise', 1)}
-                        className="px-3 py-3 bg-orange-600 hover:bg-orange-500 rounded-lg font-bold transition-colors"
-                      >
-                        +$1 (${toCall + 1})
-                      </button>
-                      <button
-                        onClick={() => handleAction('raise', 2)}
-                        className="px-3 py-3 bg-orange-600 hover:bg-orange-500 rounded-lg font-bold transition-colors"
-                      >
-                        +$2 (${toCall + 2})
-                      </button>
-                      <button
-                        onClick={() => handleAction('raise', 3)}
-                        className="px-3 py-3 bg-orange-600 hover:bg-orange-500 rounded-lg font-bold transition-colors"
-                      >
-                        +$3 (${toCall + 3})
-                      </button>
-                    </div>
+                  <div className="grid grid-cols-3 gap-1">
+                    <button
+                      onClick={() => handleAction('raise', 1)}
+                      className="px-1 py-1 bg-orange-600 hover:bg-orange-500 rounded text-xs font-bold transition-colors"
+                    >
+                      +$1
+                    </button>
+                    <button
+                      onClick={() => handleAction('raise', 2)}
+                      className="px-1 py-1 bg-orange-600 hover:bg-orange-500 rounded text-xs font-bold transition-colors"
+                    >
+                      +$2
+                    </button>
+                    <button
+                      onClick={() => handleAction('raise', 3)}
+                      className="px-1 py-1 bg-orange-600 hover:bg-orange-500 rounded text-xs font-bold transition-colors"
+                    >
+                      +$3
+                    </button>
                   </div>
                 )}
 
-                <div className={`grid ${canCheck ? 'grid-cols-3' : 'grid-cols-2'} gap-2`}>
+                <div className={`grid ${canCheck ? 'grid-cols-3' : 'grid-cols-2'} gap-1`}>
                   <button
                     onClick={() => handleAction('peek')}
-                    className="px-3 py-3 bg-purple-600 hover:bg-purple-500 rounded-lg font-bold transition-colors"
+                    className="px-1 py-1 bg-purple-600 hover:bg-purple-500 rounded text-xs font-bold transition-colors"
                   >
                     Peek $1
                   </button>
                   {canCheck && (
                     <button
                       onClick={() => handleAction('check')}
-                      className="px-3 py-3 bg-gray-600 hover:bg-gray-500 rounded-lg font-bold transition-colors"
+                      className="px-1 py-1 bg-gray-600 hover:bg-gray-500 rounded text-xs font-bold transition-colors"
                     >
                       Check
                     </button>
                   )}
                   <button
                     onClick={() => handleAction('fold')}
-                    className="px-3 py-3 bg-red-600 hover:bg-red-500 rounded-lg font-bold transition-colors"
+                    className="px-1 py-1 bg-red-600 hover:bg-red-500 rounded text-xs font-bold transition-colors"
                   >
                     Fold
                   </button>
@@ -1257,43 +1218,41 @@ export default function Kicker() {
               )}
             </div>
 
-            {/* Board + Active Player's Card */}
-            <div className="p-4 bg-gray-900/60 rounded-xl mb-4">
-              <div className="flex justify-center items-end gap-6">
-                {/* Board Card */}
-                <div className="text-center">
-                  <div className="text-xs text-gray-400 mb-1">Board</div>
-                  <Card card={communalCard} highlight={boardHighest} />
-                  {boardHighest && (
-                    <div className="text-purple-400 text-xs mt-1">HIGH</div>
-                  )}
-                </div>
-
-                {/* Active Player's Card */}
-                <div className="text-center">
-                  <div className="text-xs text-amber-400 font-bold mb-1">{currentPlayerData.name}</div>
-                  <Card
-                    card={currentPlayerData.card}
-                    highlight={currentPlayerData.card?.value === communalCard?.value}
-                  />
-                  {currentPlayerData.card?.value === communalCard?.value && (
-                    <div className="text-yellow-400 text-xs mt-1">PAIRS!</div>
-                  )}
-                </div>
+            {/* Your Card (for active player) */}
+            <div className="p-1.5 bg-amber-900/30 rounded-lg mb-1 flex-shrink-0 border border-amber-400/50">
+              <div className="flex justify-center items-center gap-2">
+                <span className="text-[10px] text-amber-400">Your card:</span>
+                <Card
+                  card={currentPlayerData.card}
+                  small
+                  highlight={currentPlayerData.card?.value === communalCard?.value}
+                />
+                {currentPlayerData.card?.value === communalCard?.value && (
+                  <span className="text-yellow-400 text-[10px] font-bold">PAIRS!</span>
+                )}
               </div>
             </div>
 
-            {/* All Players - shows what everyone knows */}
-            <div className="p-3 bg-gray-900/40 rounded-xl mb-4">
-              <div className="text-xs text-gray-500 text-center mb-2">Revealed Cards</div>
-              <div className="flex justify-center gap-4">
+            {/* Game Board - Board card + all player cards */}
+            <div className="p-1.5 bg-gray-900/60 rounded-lg flex-shrink-0">
+              <div className="flex justify-center items-end gap-2">
+                {/* Board Card */}
+                <div className="text-center">
+                  <div className="text-[10px] text-emerald-400 font-bold">Board</div>
+                  <Card card={communalCard} small highlight={boardHighest} />
+                  {boardHighest && (
+                    <div className="text-purple-400 text-[10px]">HIGH</div>
+                  )}
+                </div>
+
+                {/* All 4 Player Cards */}
                 {players.map((p, idx) => {
                   if (p.eliminated) {
                     return (
                       <div key={idx} className="text-center opacity-30">
-                        <div className="text-xs mb-1 text-gray-500">{p.name}</div>
-                        <div className="w-12 h-16 rounded-lg bg-gray-800 flex items-center justify-center">
-                          <span className="text-red-400 text-xs font-bold">OUT</span>
+                        <div className="text-[10px] text-gray-500 truncate max-w-[40px]">{p.name}</div>
+                        <div className="w-8 h-11 rounded bg-gray-800 flex items-center justify-center">
+                          <span className="text-red-400 text-[8px] font-bold">OUT</span>
                         </div>
                       </div>
                     );
@@ -1303,12 +1262,12 @@ export default function Kicker() {
 
                   return (
                     <div key={idx} className={`text-center ${p.folded ? 'opacity-40' : ''}`}>
-                      <div className={`text-xs mb-1 ${isCurrentTurn ? 'text-amber-400 font-bold' : 'text-gray-400'}`}>
+                      <div className={`text-[10px] truncate max-w-[40px] ${isCurrentTurn ? 'text-amber-400 font-bold' : 'text-gray-400'}`}>
                         {p.name}
-                        {idx === dealer && ' (D)'}
+                        {idx === dealer && ' D'}
                         {p.folded && ' X'}
                       </div>
-                      <div className={`inline-block ${p.revealed ? 'ring-2 ring-cyan-400 rounded-lg p-1' : ''}`}>
+                      <div className={`inline-block ${p.revealed ? 'ring-1 ring-cyan-400 rounded' : ''}`}>
                         <Card
                           card={p.card}
                           small
@@ -1317,7 +1276,7 @@ export default function Kicker() {
                         />
                       </div>
                       {p.revealed && pairsBoard && (
-                        <div className="text-yellow-400 text-xs mt-1">PAIRS!</div>
+                        <div className="text-yellow-400 text-[10px]">PAIRS!</div>
                       )}
                     </div>
                   );
@@ -1327,15 +1286,15 @@ export default function Kicker() {
 
             {/* Current Bets */}
             {players.some(p => p.currentBet > 0) && (
-              <div className="flex justify-center gap-3 text-xs">
+              <div className="flex justify-center gap-2 text-[10px] mt-1 flex-shrink-0">
                 {players.map((p, i) => p.currentBet > 0 && (
-                  <div key={i} className="text-gray-400">
-                    {i === currentPlayer ? 'You' : p.name}: <span className="text-red-400">${p.currentBet}</span>
-                  </div>
+                  <span key={i} className="text-gray-400">
+                    {p.name}: <span className="text-red-400">${p.currentBet}</span>
+                  </span>
                 ))}
               </div>
             )}
-          </>
+          </div>
         )}
       </div>
     </div>
