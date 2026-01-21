@@ -430,7 +430,7 @@ export default function Kicker() {
         i === revealerIndex ? { ...p, revealed: true } : p
       );
       setMessage(`${revealedPlayers[revealerIndex].name} reveals: ${revealedPlayers[revealerIndex].card!.rank}${revealedPlayers[revealerIndex].card!.suit}`);
-
+      setPot(potToUse);
       startNextBettingRound(revealedPlayers, nextReveal);
     } else if (nextPlayer === bettingRoundStarter && currentBetToUse === 0) {
       const nextReveal = revealPhase + 1;
@@ -454,7 +454,7 @@ export default function Kicker() {
         i === revealerIndex ? { ...p, revealed: true } : p
       );
       setMessage(`${revealedPlayers[revealerIndex].name} reveals: ${revealedPlayers[revealerIndex].card!.rank}${revealedPlayers[revealerIndex].card!.suit}`);
-
+      setPot(potToUse);
       startNextBettingRound(revealedPlayers, nextReveal);
     } else {
       setCurrentPlayer(nextPlayer);
