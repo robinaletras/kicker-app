@@ -1253,56 +1253,106 @@ export default function Kicker() {
 
         {gameState === 'setup' && (
           <div className="flex-1 flex flex-col gap-2 overflow-hidden">
-            <div className="p-3 bg-gray-900/80 rounded-xl flex-shrink-0">
-              <h3 className="font-semibold text-amber-400 mb-2 text-sm">Player Names</h3>
-              <div className="grid grid-cols-2 gap-3">
-                {/* Reorder: Player 1 & 3 on top, Player 2 & 4 on bottom */}
-                {[0, 2, 1, 3].map((i) => {
-                  const name = playerNames[i];
-                  return (
-                    <div key={i} className="relative">
-                      <input
-                        type="text"
-                        value={name}
-                        onChange={(e) => handleNameChange(i, e.target.value)}
-                        onFocus={(e) => {
-                          if (name === `Player ${i + 1}` || isPlayerAI[i]) {
-                            const newNames = [...playerNames];
-                            newNames[i] = '';
-                            setPlayerNames(newNames);
-                            if (isPlayerAI[i]) {
-                              const newIsAI = [...isPlayerAI];
-                              newIsAI[i] = false;
-                              setIsPlayerAI(newIsAI);
+            <div className="p-4 bg-gray-900/80 rounded-xl flex-shrink-0">
+              <h3 className="font-semibold text-amber-400 mb-3 text-base">Player Names</h3>
+              {/* Mobile: 1 column, Desktop: 2 columns with 1,2 left and 3,4 right */}
+              <div className="flex flex-col sm:flex-row gap-4">
+                {/* Left column: Players 1 & 2 */}
+                <div className="flex-1 flex flex-col gap-3">
+                  {[0, 1].map((i) => {
+                    const name = playerNames[i];
+                    return (
+                      <div key={i} className="relative">
+                        <input
+                          type="text"
+                          value={name}
+                          onChange={(e) => handleNameChange(i, e.target.value)}
+                          onFocus={(e) => {
+                            if (name === `Player ${i + 1}` || isPlayerAI[i]) {
+                              const newNames = [...playerNames];
+                              newNames[i] = '';
+                              setPlayerNames(newNames);
+                              if (isPlayerAI[i]) {
+                                const newIsAI = [...isPlayerAI];
+                                newIsAI[i] = false;
+                                setIsPlayerAI(newIsAI);
+                              }
                             }
-                          }
-                          e.target.select();
-                        }}
-                        onBlur={() => {
-                          if (name.trim() === '') {
-                            const newNames = [...playerNames];
-                            newNames[i] = `Player ${i + 1}`;
-                            setPlayerNames(newNames);
-                          }
-                        }}
-                        className={`w-full px-3 py-2 bg-gray-800 border-2 rounded-lg text-white text-sm ${isPlayerAI[i] ? 'border-cyan-400' : i === dealer ? 'border-amber-400' : 'border-gray-700'}`}
-                        placeholder={`Player ${i + 1}`}
-                      />
-                      {isPlayerAI[i] && (
-                        <span className="absolute -top-2 -left-1 bg-cyan-500 text-gray-900 text-xs font-bold px-2 py-0.5 rounded-full">
-                          AI
-                        </span>
-                      )}
-                      {i === dealer && (
-                        <span className="absolute -top-2 -right-1 bg-amber-500 text-gray-900 text-xs font-bold px-2 py-0.5 rounded-full">
-                          D
-                        </span>
-                      )}
-                    </div>
-                  );
-                })}
+                            e.target.select();
+                          }}
+                          onBlur={() => {
+                            if (name.trim() === '') {
+                              const newNames = [...playerNames];
+                              newNames[i] = `Player ${i + 1}`;
+                              setPlayerNames(newNames);
+                            }
+                          }}
+                          className={`w-full px-4 py-3 bg-gray-800 border-2 rounded-lg text-white text-base ${isPlayerAI[i] ? 'border-cyan-400' : i === dealer ? 'border-amber-400' : 'border-gray-700'}`}
+                          placeholder={`Player ${i + 1}`}
+                        />
+                        {isPlayerAI[i] && (
+                          <span className="absolute -top-2 -left-1 bg-cyan-500 text-gray-900 text-xs font-bold px-2 py-0.5 rounded-full">
+                            AI
+                          </span>
+                        )}
+                        {i === dealer && (
+                          <span className="absolute -top-2 -right-1 bg-amber-500 text-gray-900 text-xs font-bold px-2 py-0.5 rounded-full">
+                            D
+                          </span>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+                {/* Right column: Players 3 & 4 */}
+                <div className="flex-1 flex flex-col gap-3">
+                  {[2, 3].map((i) => {
+                    const name = playerNames[i];
+                    return (
+                      <div key={i} className="relative">
+                        <input
+                          type="text"
+                          value={name}
+                          onChange={(e) => handleNameChange(i, e.target.value)}
+                          onFocus={(e) => {
+                            if (name === `Player ${i + 1}` || isPlayerAI[i]) {
+                              const newNames = [...playerNames];
+                              newNames[i] = '';
+                              setPlayerNames(newNames);
+                              if (isPlayerAI[i]) {
+                                const newIsAI = [...isPlayerAI];
+                                newIsAI[i] = false;
+                                setIsPlayerAI(newIsAI);
+                              }
+                            }
+                            e.target.select();
+                          }}
+                          onBlur={() => {
+                            if (name.trim() === '') {
+                              const newNames = [...playerNames];
+                              newNames[i] = `Player ${i + 1}`;
+                              setPlayerNames(newNames);
+                            }
+                          }}
+                          className={`w-full px-4 py-3 bg-gray-800 border-2 rounded-lg text-white text-base ${isPlayerAI[i] ? 'border-cyan-400' : i === dealer ? 'border-amber-400' : 'border-gray-700'}`}
+                          placeholder={`Player ${i + 1}`}
+                        />
+                        {isPlayerAI[i] && (
+                          <span className="absolute -top-2 -left-1 bg-cyan-500 text-gray-900 text-xs font-bold px-2 py-0.5 rounded-full">
+                            AI
+                          </span>
+                        )}
+                        {i === dealer && (
+                          <span className="absolute -top-2 -right-1 bg-amber-500 text-gray-900 text-xs font-bold px-2 py-0.5 rounded-full">
+                            D
+                          </span>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
-              <div className="mt-2 text-center text-xs text-gray-400">
+              <div className="mt-3 text-center text-sm text-gray-400">
                 {playerNames[dealer]} deals • Type "AI" for bots
               </div>
             </div>
