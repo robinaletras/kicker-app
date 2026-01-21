@@ -184,7 +184,7 @@ const WinnerScreen = ({ winner, pot, players, boardCard, onNextRound, rollover }
 
           return (
             <div key={i} className={`text-center ${p.folded ? 'opacity-40' : ''}`}>
-              <div className={`text-xs mb-1 truncate max-w-[50px] ${isWinner ? 'text-amber-400 font-bold' : 'text-gray-400'}`}>
+              <div className={`text-xs mb-1 truncate max-w-[70px] ${isWinner ? 'text-amber-400 font-bold' : 'text-gray-400'}`}>
                 {p.name}
               </div>
               <Card
@@ -1514,7 +1514,7 @@ export default function Kicker() {
                   if (p.eliminated) {
                     return (
                       <div key={idx} className="text-center opacity-30">
-                        <div className="text-xs text-gray-500 truncate max-w-[50px]">{p.name}</div>
+                        <div className="text-xs text-gray-500 truncate max-w-[70px]">{p.name}</div>
                         <div className="w-11 h-16 rounded-lg bg-gray-800 flex items-center justify-center">
                           <span className="text-red-400 text-xs font-bold">OUT</span>
                         </div>
@@ -1526,7 +1526,7 @@ export default function Kicker() {
 
                   return (
                     <div key={idx} className={`text-center ${p.folded ? 'opacity-40' : ''}`}>
-                      <div className={`text-xs truncate max-w-[50px] ${isCurrentTurn ? 'text-amber-400 font-bold' : 'text-gray-400'}`}>
+                      <div className={`text-xs truncate max-w-[70px] ${isCurrentTurn ? 'text-amber-400 font-bold' : 'text-gray-400'}`}>
                         {p.name}
                         {idx === dealer && ' D'}
                       </div>
