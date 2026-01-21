@@ -583,20 +583,10 @@ export default function Kicker() {
       const pairRank = allCards.find(c => c.value === pairs[0].value)?.rank || '';
       const handDescription = `Full House, ${tripRank}s full of ${pairRank}s`;
 
-      // In full house, no kicker - trips holder wins, or tie if board involved
-      if (trips!.players.length === 1) {
-        return { name: trips!.players[0].name, isSplit: false, reason: handDescription, rollover: false };
-      } else if (trips!.players.length > 1) {
-        // Tie - rollover
-        return { name: 'Tie', isSplit: false, reason: `${handDescription} - Tie!`, rollover: true };
-      }
-      // Board has the trips - pair holders determine winner
-      if (pairs[0].players.length === 1) {
-        return { name: pairs[0].players[0].name, isSplit: false, reason: handDescription, rollover: false };
-      } else if (pairs[0].players.length > 1) {
-        return { name: 'Tie', isSplit: false, reason: `${handDescription} - Tie!`, rollover: true };
-      }
-      return { name: 'Board', isSplit: false, reason: handDescription, rollover: true };
+      // Each player has only ONE card, so no one can own both trips AND pair
+      // Full house is always a shared hand - rollover
+      console.log('Full house - shared hand, rollover');
+      return { name: 'Tie', isSplit: false, reason: `${handDescription} - Tie!`, rollover: true };
     }
 
     // 4. Flush
@@ -657,16 +647,12 @@ export default function Kicker() {
       const pair2Rank = allCards.find(c => c.value === pairs[1].value)?.rank || '';
       const handDescription = `Two Pair, ${pair1Rank}s and ${pair2Rank}s`;
       const usedValues = new Set([pairs[0].value, pairs[1].value]);
+      const kickerDesc = getKickerDescription(usedValues);
 
-      // Player who made the HIGHER pair wins
-      // If higher pair involves board only, fall back to lower pair makers
-      if (pairs[0].players.length > 0) {
-        return resolveByHandMaker(handDescription, usedValues, pairs[0].players);
-      } else if (pairs[1].players.length > 0) {
-        return resolveByHandMaker(handDescription, usedValues, pairs[1].players);
-      }
-      // Both pairs involve only board (impossible with 1 board card)
-      return { name: 'Board', isSplit: false, reason: handDescription, rollover: true };
+      // For two pair, no single player "owns" both pairs
+      // So it's a shared hand - rollover
+      console.log('Two pair detected - rollover (no single owner)');
+      return { name: 'Tie', isSplit: false, reason: `${handDescription}${kickerDesc} - Tie!`, rollover: true };
     }
 
     // 8. One pair
