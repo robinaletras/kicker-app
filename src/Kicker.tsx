@@ -176,6 +176,7 @@ export default function Kicker() {
   const [playerNames, setPlayerNames] = useState(['Player 1', 'Player 2', 'Player 3', 'Player 4']);
   const [isPlayerAI, setIsPlayerAI] = useState([false, false, false, false]);
   const [autoAI, setAutoAI] = useState(true);
+  const [aiSpeed, setAiSpeed] = useState(1); // 0.5 = fast, 1 = normal, 2 = slow
   const [aiPendingAction, setAiPendingAction] = useState<{ action: Action; amount?: number } | null>(null);
   const [lastRaiser, setLastRaiser] = useState(-1);
   const [bettingRoundStarter, setBettingRoundStarter] = useState(0);
@@ -773,11 +774,16 @@ export default function Kicker() {
     if (!currentPlayerData?.aiLevel) return;
     if (winner) return;
 
+    // Base timings (ms) multiplied by aiSpeed
+    const passDelay = 1200 * aiSpeed;
+    const thinkDelay = 1000 * aiSpeed;
+    const executeDelay = 1500 * aiSpeed;
+
     // Auto-skip pass screen for AI
     if (showPassScreen && gameState === 'passing') {
       const timer = setTimeout(() => {
         handleReady();
-      }, 1200);
+      }, passDelay);
       return () => clearTimeout(timer);
     }
 
@@ -788,18 +794,18 @@ export default function Kicker() {
         const timer = setTimeout(() => {
           const decision = makeAIDecision(currentPlayerData);
           setAiPendingAction(decision);
-        }, 1000);
+        }, thinkDelay);
         return () => clearTimeout(timer);
       } else {
         // Then execute it after showing the highlight
         const timer = setTimeout(() => {
           handleAction(aiPendingAction.action, aiPendingAction.amount || 0);
           setAiPendingAction(null);
-        }, 1500);
+        }, executeDelay);
         return () => clearTimeout(timer);
       }
     }
-  }, [gameState, currentPlayer, showPassScreen, currentPlayerData?.aiLevel, winner, aiPendingAction, autoAI]);
+  }, [gameState, currentPlayer, showPassScreen, currentPlayerData?.aiLevel, winner, aiPendingAction, autoAI, aiSpeed]);
 
   // Clear pending action when player changes
   useEffect(() => {
@@ -989,9 +995,9 @@ export default function Kicker() {
               </div>
             </div>
 
-            {/* AI Auto/Manual Toggle */}
+            {/* AI Controls */}
             {players.some(p => p.aiLevel) && (
-              <div className="flex justify-center mb-3">
+              <div className="flex justify-center items-center gap-4 mb-3">
                 <button
                   onClick={() => setAutoAI(!autoAI)}
                   className={`px-4 py-1 rounded-full text-sm font-medium transition-colors ${
@@ -1002,6 +1008,25 @@ export default function Kicker() {
                 >
                   AI: {autoAI ? 'Auto' : 'Manual'}
                 </button>
+
+                {/* Speed Controls */}
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => setAiSpeed(Math.max(0.25, aiSpeed - 0.25))}
+                    className="w-8 h-8 rounded-full bg-gray-700 hover:bg-gray-600 text-white font-bold transition-colors"
+                  >
+                    -
+                  </button>
+                  <span className="text-xs text-gray-400 w-12 text-center">
+                    {aiSpeed === 0.25 ? 'Fast' : aiSpeed === 0.5 ? '2x' : aiSpeed === 0.75 ? '1.5x' : aiSpeed === 1 ? '1x' : aiSpeed === 1.5 ? '0.7x' : '0.5x'}
+                  </span>
+                  <button
+                    onClick={() => setAiSpeed(Math.min(2, aiSpeed + 0.25))}
+                    className="w-8 h-8 rounded-full bg-gray-700 hover:bg-gray-600 text-white font-bold transition-colors"
+                  >
+                    +
+                  </button>
+                </div>
               </div>
             )}
 
