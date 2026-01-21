@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 
 const SUITS = ['♠', '♥', '♦', '♣'] as const;
 const RANKS = ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A'] as const;
@@ -13,6 +13,12 @@ interface CardType {
   value: number;
 }
 
+// AI Skill Levels:
+// 'cautious' - folds when a higher card is revealed
+// 'random' - randomly folds sometimes
+// 'aggressive' - never folds, bets/raises often
+type AISkillLevel = 'cautious' | 'random' | 'aggressive';
+
 interface Player {
   name: string;
   chips: number;
@@ -21,6 +27,7 @@ interface Player {
   folded: boolean;
   peekedCards: CardType[];
   currentBet: number;
+  aiLevel?: AISkillLevel;
 }
 
 interface Winner {
@@ -171,6 +178,13 @@ export default function Kicker() {
   const [dealer, setDealer] = useState(0);
   const [revealOrder, setRevealOrder] = useState<number[]>([]);
 
+  const isAI = (name: string) => name.toLowerCase() === 'ai';
+
+  const getRandomAILevel = (): AISkillLevel => {
+    const levels: AISkillLevel[] = ['cautious', 'random', 'aggressive'];
+    return levels[Math.floor(Math.random() * levels.length)];
+  };
+
   const dealCards = () => {
     const newDeck = createDeck();
     const communal = newDeck.pop()!;
@@ -189,6 +203,7 @@ export default function Kicker() {
       folded: false,
       peekedCards: [],
       currentBet: 0,
+      aiLevel: isAI(playerNames[i]) ? getRandomAILevel() : undefined,
     }));
 
     const antePlayers = newPlayers.map(p => ({ ...p, chips: p.chips - 1 }));
@@ -226,6 +241,76 @@ export default function Kicker() {
       attempts++;
     }
     return attempts >= 4 ? -1 : next;
+  };
+
+  // AI Decision Making
+  const makeAIDecision = (player: Player): { action: Action; amount?: number } => {
+    const myCard = player.card!;
+    const aiLevel = player.aiLevel!;
+    const toCall = currentBetAmount - player.currentBet;
+    const canCheck = currentBetAmount === 0;
+
+    // Get revealed cards that are higher than mine
+    const revealedHigherCards = players.filter(
+      p => p.revealed && !p.folded && p.card && p.card.value > myCard.value
+    );
+
+    // Check if board is higher than my card
+    const boardHigher = communalCard && communalCard.value > myCard.value;
+
+    // Check if I pair with the board
+    const pairsWithBoard = communalCard && communalCard.value === myCard.value;
+
+    if (aiLevel === 'cautious') {
+      // Folds when a higher card is revealed or board is higher
+      if (revealedHigherCards.length > 0 || boardHigher) {
+        if (canCheck) return { action: 'check' };
+        return { action: 'fold' };
+      }
+      // Otherwise just call or check
+      if (canCheck) return { action: 'check' };
+      if (toCall > 0) return { action: 'call' };
+      return { action: 'bet', amount: 1 };
+    }
+
+    if (aiLevel === 'random') {
+      // 30% chance to fold if there's a bet (unless pairs with board)
+      if (!pairsWithBoard && toCall > 0 && Math.random() < 0.3) {
+        return { action: 'fold' };
+      }
+      // 20% chance to bet/raise
+      if (Math.random() < 0.2) {
+        const amount = Math.floor(Math.random() * 3) + 1;
+        if (canCheck) return { action: 'bet', amount };
+        return { action: 'raise', amount };
+      }
+      // Otherwise call or check
+      if (canCheck) return { action: 'check' };
+      return { action: 'call' };
+    }
+
+    if (aiLevel === 'aggressive') {
+      // Never folds, often bets/raises
+      if (pairsWithBoard) {
+        // Always raise big with board pair
+        const amount = 3;
+        if (canCheck) return { action: 'bet', amount };
+        return { action: 'raise', amount };
+      }
+      // 50% chance to bet/raise
+      if (Math.random() < 0.5) {
+        const amount = Math.floor(Math.random() * 2) + 1;
+        if (canCheck) return { action: 'bet', amount };
+        return { action: 'raise', amount };
+      }
+      // Otherwise call or check
+      if (canCheck) return { action: 'check' };
+      return { action: 'call' };
+    }
+
+    // Default fallback
+    if (canCheck) return { action: 'check' };
+    return { action: 'call' };
   };
 
   const determineWinner = (): Winner => {
@@ -569,6 +654,29 @@ export default function Kicker() {
 
   const { boardHighest } = getHighlightInfo();
 
+  // AI auto-play effect
+  useEffect(() => {
+    if (gameState !== 'playing' && gameState !== 'passing') return;
+    if (!currentPlayerData?.aiLevel) return;
+    if (winner) return;
+
+    // Auto-skip pass screen for AI
+    if (showPassScreen && gameState === 'passing') {
+      const timer = setTimeout(() => {
+        handleReady();
+      }, 500);
+      return () => clearTimeout(timer);
+    }
+
+    // Make AI decision when it's their turn to play
+    if (gameState === 'playing' && !showPassScreen) {
+      const timer = setTimeout(() => {
+        const decision = makeAIDecision(currentPlayerData);
+        handleAction(decision.action, decision.amount || 0);
+      }, 1000);
+      return () => clearTimeout(timer);
+    }
+  }, [gameState, currentPlayer, showPassScreen, currentPlayerData?.aiLevel, winner]);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-emerald-950 to-gray-900 text-white p-4 font-sans">
@@ -636,6 +744,11 @@ export default function Kicker() {
                       className={`w-full px-3 py-2 bg-gray-800 border rounded-lg text-white ${i === dealer ? 'border-amber-400' : 'border-gray-700'}`}
                       placeholder={`Player ${i + 1}`}
                     />
+                    {isAI(name) && (
+                      <span className="absolute -top-2 -left-2 bg-cyan-500 text-gray-900 text-xs font-bold px-2 py-0.5 rounded-full">
+                        AI
+                      </span>
+                    )}
                     {i === dealer && (
                       <span className="absolute -top-2 -right-2 bg-amber-500 text-gray-900 text-xs font-bold px-2 py-0.5 rounded-full">
                         DEALER
@@ -646,6 +759,9 @@ export default function Kicker() {
               </div>
               <div className="mt-3 text-center text-sm text-gray-400">
                 {playerNames[dealer]} is the dealer
+              </div>
+              <div className="mt-2 text-center text-xs text-cyan-400">
+                Type "AI" for computer players
               </div>
             </div>
 
@@ -709,25 +825,38 @@ export default function Kicker() {
             <div className="p-4 bg-amber-900/40 rounded-xl border-2 border-amber-400 mb-4">
               <div className="text-center mb-3">
                 <span className="text-amber-400 font-bold text-xl">{currentPlayerData.name}'s Turn</span>
+                {currentPlayerData.aiLevel && (
+                  <span className="text-cyan-400 ml-2 text-sm">({currentPlayerData.aiLevel} AI)</span>
+                )}
                 {currentPlayerData.currentBet > 0 && (
                   <span className="text-gray-400 ml-2">(bet: ${currentPlayerData.currentBet})</span>
                 )}
               </div>
 
-              {/* Peeked Cards */}
-              {currentPlayerData.peekedCards.length > 0 && (
-                <div className="mb-4">
-                  <div className="text-xs text-gray-400 mb-1 text-center">Your Peeked Cards</div>
-                  <div className="flex gap-2 justify-center">
-                    {currentPlayerData.peekedCards.map((card, i) => (
-                      <Card key={i} card={card} small />
-                    ))}
-                  </div>
+              {/* AI Thinking Indicator */}
+              {currentPlayerData.aiLevel && (
+                <div className="text-center py-8">
+                  <div className="text-cyan-400 text-lg animate-pulse">AI is thinking...</div>
                 </div>
               )}
 
-              {/* Actions */}
-              <div className="space-y-2">
+              {/* Human Player Controls */}
+              {!currentPlayerData.aiLevel && (
+                <>
+                  {/* Peeked Cards */}
+                  {currentPlayerData.peekedCards.length > 0 && (
+                    <div className="mb-4">
+                      <div className="text-xs text-gray-400 mb-1 text-center">Your Peeked Cards</div>
+                      <div className="flex gap-2 justify-center">
+                        {currentPlayerData.peekedCards.map((card, i) => (
+                          <Card key={i} card={card} small />
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Actions */}
+                  <div className="space-y-2">
                 {canBet && (
                   <div>
                     <div className="text-xs text-gray-400 mb-1 text-center">Bet</div>
@@ -801,8 +930,10 @@ export default function Kicker() {
                   >
                     Fold
                   </button>
+                  </div>
                 </div>
-              </div>
+              </>
+              )}
             </div>
 
             {/* Board + Active Player's Card */}
