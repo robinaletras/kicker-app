@@ -1014,9 +1014,39 @@ export default function Kicker() {
     // 8. One pair
     if (pairs.length === 1) {
       const pairRank = allCards.find(c => c.value === pairs[0].value)?.rank || '';
-      const handDescription = `Pair of ${pairRank}s`;
-      const usedValues = new Set([pairs[0].value]);
-      return resolveByHandMaker(handDescription, usedValues, pairs[0].players);
+      const pairValue = pairs[0].value;
+      const includesBoard = pairs[0].includesBoard;
+
+      // Find ALL players who have this card value (not just from pairs array)
+      const playersWithPairValue = activePlayers.filter(p => p.card!.value === pairValue);
+
+      console.log('One pair detected:', pairRank, 'includesBoard:', includesBoard);
+      console.log('Players with pair value:', playersWithPairValue.map(p => p.name));
+
+      if (includesBoard) {
+        // Player pairs with board - they win (or split if multiple players pair with board, which would be trips)
+        const handDescription = `Pair of ${pairRank}s (with board)`;
+        const usedValues = new Set([pairValue]);
+        return resolveByHandMaker(handDescription, usedValues, playersWithPairValue);
+      } else {
+        // Player pair (two players have same card) - they split
+        const handDescription = `Pair of ${pairRank}s`;
+        const usedValues = new Set([pairValue]);
+
+        // Ensure we include ALL players with this card value
+        if (playersWithPairValue.length >= 2) {
+          console.log('Player pair - splitting between:', playersWithPairValue.map(p => p.name));
+          return {
+            name: playersWithPairValue.map(p => p.name).join(' & '),
+            isSplit: true,
+            players: playersWithPairValue,
+            reason: `${handDescription}${getKickerDescription(usedValues)}`,
+            rollover: false
+          };
+        }
+
+        return resolveByHandMaker(handDescription, usedValues, playersWithPairValue);
+      }
     }
 
     // 9. High card
