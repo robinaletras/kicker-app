@@ -270,6 +270,9 @@ export default function Kicker() {
   const [showPassScreen, setShowPassScreen] = useState(false);
   const [winner, setWinner] = useState<Winner | null>(null);
   const [isRollover, setIsRollover] = useState(false);
+  const [playerBroke, setPlayerBroke] = useState(false); // Human player ran out of money
+  const [showBrokeScreen, setShowBrokeScreen] = useState(false); // "You're out of money" screen
+  const [showResetScreen, setShowResetScreen] = useState(false); // "Money has been reset" screen
   const [playerNames, setPlayerNames] = useState(['Player 1', 'Player 2', 'Player 3', 'Player 4']);
   const [isPlayerAI, setIsPlayerAI] = useState([false, false, false, false]);
   const [autoAI, _setAutoAI] = useState(true);
@@ -1077,6 +1080,21 @@ export default function Kicker() {
     }
 
     setPlayers(newPlayers);
+
+    // Check if human player is broke (0 chips and didn't win)
+    const humanPlayerIndex = localPlayerSeat !== null ? localPlayerSeat : 0;
+    const humanPlayer = newPlayers[humanPlayerIndex];
+    const humanWon = mainWinner.name === humanPlayer.name ||
+      (mainWinner.isSplit && mainWinner.players?.some(p => p.name === humanPlayer.name));
+
+    if (humanPlayer.chips <= 0 && !humanWon) {
+      setPlayerBroke(true);
+      setShowBrokeScreen(true);
+      setRolloverPot(totalRollover);
+      setIsRollover(totalRollover > 0);
+      return; // Don't show winner screen, show broke screen instead
+    }
+
     setWinner(mainWinner);
     setRolloverPot(totalRollover);
     setIsRollover(totalRollover > 0);
@@ -1616,7 +1634,20 @@ export default function Kicker() {
     if (!currentPlayerData?.aiLevel) return;
     if (winner) return;
 
-    // Base timings (ms) multiplied by aiSpeed
+    // If player is broke, run AI instantly
+    if (playerBroke) {
+      if (showPassScreen && gameState === 'passing') {
+        handleReady();
+        return;
+      }
+      if (gameState === 'playing' && !showPassScreen) {
+        const decision = makeAIDecision(currentPlayerData, currentPlayer);
+        handleAction(decision.action, decision.amount || 0);
+        return;
+      }
+    }
+
+    // Normal timing - Base timings (ms) multiplied by aiSpeed
     const passDelay = 1200 * aiSpeed;
     const thinkDelay = 1000 * aiSpeed;
     const executeDelay = 1500 * aiSpeed;
@@ -1647,12 +1678,23 @@ export default function Kicker() {
         return () => clearTimeout(timer);
       }
     }
-  }, [gameState, currentPlayer, showPassScreen, currentPlayerData?.aiLevel, winner, aiPendingAction, autoAI, aiSpeed]);
+  }, [gameState, currentPlayer, showPassScreen, currentPlayerData?.aiLevel, winner, aiPendingAction, autoAI, aiSpeed, playerBroke]);
 
   // Clear pending action when player changes
   useEffect(() => {
     setAiPendingAction(null);
   }, [currentPlayer]);
+
+  // Detect when human player goes broke mid-hand
+  useEffect(() => {
+    if (playerBroke) return; // Already broke
+    if (gameState !== 'playing' && gameState !== 'passing') return;
+    const humanPlayerIndex = localPlayerSeat !== null ? localPlayerSeat : 0;
+    const humanPlayer = players[humanPlayerIndex];
+    if (humanPlayer && humanPlayer.chips <= 0 && !humanPlayer.eliminated) {
+      setPlayerBroke(true);
+    }
+  }, [players, gameState, localPlayerSeat, playerBroke]);
 
   // Auto-advance replay at current AI speed
   useEffect(() => {
@@ -1673,6 +1715,57 @@ export default function Kicker() {
         .font-display { font-family: 'Playfair Display', serif; }
         .font-body { font-family: 'Source Sans Pro', sans-serif; }
       `}</style>
+
+      {/* BROKE SCREEN - Player ran out of money */}
+      {showBrokeScreen && (
+        <div className="fixed inset-0 bg-gray-900/95 flex flex-col items-center justify-center z-50">
+          <div className="text-center p-6 max-w-sm">
+            <h2 className="font-display text-3xl text-red-400 mb-4">Out of Money!</h2>
+            <p className="text-gray-300 text-lg mb-8">You've lost all your chips.</p>
+            <button
+              onClick={() => {
+                setShowBrokeScreen(false);
+                setShowResetScreen(true);
+              }}
+              className="px-8 py-3 bg-gradient-to-r from-gray-600 to-gray-500 text-white rounded-xl font-bold text-base shadow-lg hover:from-gray-500 hover:to-gray-400 transition-all"
+            >
+              Main Menu
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* RESET SCREEN - Money has been reset */}
+      {showResetScreen && (
+        <div className="fixed inset-0 bg-gray-900/95 flex flex-col items-center justify-center z-50">
+          <div className="text-center p-6 max-w-sm">
+            <h2 className="font-display text-2xl text-emerald-400 mb-4">Money Reset</h2>
+            <p className="text-gray-300 text-lg mb-8">Your chips have been reset to $50.</p>
+            <button
+              onClick={() => {
+                setShowResetScreen(false);
+                setPlayerBroke(false);
+                setGameState('menu');
+                setSeatedPlayers([null, null, null, null]);
+                setLocalPlayerSeat(null);
+                setLocalPlayerName('');
+                setPlayers([
+                  { name: 'Player 1', chips: 50, card: null, revealed: false, folded: false, eliminated: false, peekedCards: [], currentBet: 0, totalRoundBet: 0, allIn: false },
+                  { name: 'Player 2', chips: 50, card: null, revealed: false, folded: false, eliminated: false, peekedCards: [], currentBet: 0, totalRoundBet: 0, allIn: false },
+                  { name: 'Player 3', chips: 50, card: null, revealed: false, folded: false, eliminated: false, peekedCards: [], currentBet: 0, totalRoundBet: 0, allIn: false },
+                  { name: 'Player 4', chips: 50, card: null, revealed: false, folded: false, eliminated: false, peekedCards: [], currentBet: 0, totalRoundBet: 0, allIn: false },
+                ]);
+                setPot(0);
+                setRolloverPot(0);
+                setWinner(null);
+              }}
+              className="px-8 py-3 bg-gradient-to-r from-emerald-600 to-emerald-500 text-white rounded-xl font-bold text-base shadow-lg hover:from-emerald-500 hover:to-emerald-400 transition-all"
+            >
+              Continue
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* MENU SCREEN */}
       {gameState === 'menu' && (
