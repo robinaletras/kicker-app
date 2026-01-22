@@ -152,96 +152,112 @@ interface WinnerScreenProps {
   boardCard: CardType | null;
   onNextRound: () => void;
   rollover: boolean;
-  onReplay?: () => void;
   onNewGame?: () => void;
+  onMainMenu?: () => void;
 }
 
-const WinnerScreen = ({ winner, pot, players, boardCard, onNextRound, rollover, onReplay, onNewGame }: WinnerScreenProps) => (
-  <div className="fixed inset-0 bg-gray-900/95 flex flex-col items-center justify-center z-50">
-    <div className="text-center p-4 max-w-md">
-      {rollover ? (
-        <>
-          <h2 className="font-display text-xl text-purple-400 mb-2">The Board was the best Kicker!</h2>
-          <p className="text-xl text-amber-400 mb-4">${pot} rolls over to next round</p>
-        </>
-      ) : (
-        <>
-          <h2 className="font-display text-xl text-amber-400 mb-2">
-            {winner.isSplit ? `${winner.name} were the best Kickers!` : `${winner.name} was the best Kicker!`}
-          </h2>
-          <p className="text-sm text-gray-400 mb-1">{winner.reason}</p>
-          <p className="text-xl text-emerald-400 mb-3">${pot} pot</p>
-        </>
-      )}
+const WinnerScreen = ({ winner, pot, players, boardCard, onNextRound, rollover, onNewGame, onMainMenu }: WinnerScreenProps) => {
+  const activePlayers = players.filter(p => !p.eliminated && p.chips > 0);
+  const gameOver = activePlayers.length <= 1;
 
-      {/* All 5 cards: Board + 4 Players */}
-      <div className="flex justify-center items-end gap-2 mb-4">
-        {/* Board Card */}
-        <div className="text-center">
-          <div className="text-xs text-emerald-400 font-bold mb-1">Board</div>
-          <Card card={boardCard} small highlight={rollover} />
-        </div>
+  return (
+    <div className="fixed inset-0 bg-gray-900/95 flex flex-col items-center justify-center z-50">
+      <div className="text-center p-4 max-w-md">
+        {rollover ? (
+          <>
+            <h2 className="font-display text-xl text-purple-400 mb-2">The Board was the best Kicker!</h2>
+            <p className="text-xl text-amber-400 mb-4">${pot} rolls over to next round</p>
+          </>
+        ) : (
+          <>
+            <h2 className="font-display text-xl text-amber-400 mb-2">
+              {winner.isSplit ? `${winner.name} were the best Kickers!` : `${winner.name} was the best Kicker!`}
+            </h2>
+            <p className="text-sm text-gray-400 mb-1">{winner.reason}</p>
+            <p className="text-xl text-emerald-400 mb-3">+${pot}</p>
+          </>
+        )}
 
-        {/* Player Cards */}
-        {players.map((p, i) => {
-          const isWinner = !rollover && (
-            winner.isSplit
-              ? winner.players?.some(wp => wp.name === p.name)
-              : winner.name === p.name
-          );
-          const pairsBoard = p.card?.value === boardCard?.value;
-
-          return (
-            <div key={i} className={`text-center ${p.folded ? 'opacity-40' : ''}`}>
-              <div className={`text-xs mb-1 truncate max-w-[70px] ${isWinner ? 'text-amber-400 font-bold' : 'text-gray-400'}`}>
-                {p.name}
-              </div>
-              <Card
-                card={p.card}
-                small
-                highlight={isWinner && !p.folded}
-              />
-              <div className="mt-1">
-                {p.folded ? (
-                  <span className="text-red-400 text-xs">Folded</span>
-                ) : pairsBoard ? (
-                  <span className="text-yellow-400 text-xs">Pairs!</span>
+        {/* Player Money Display */}
+        <div className="bg-gray-800/80 rounded-xl p-3 mb-4">
+          <div className="grid grid-cols-4 gap-2">
+            {players.map((p, i) => (
+              <div key={i} className={`text-center ${p.eliminated || p.chips <= 0 ? 'opacity-40' : ''}`}>
+                <div className="text-xs text-gray-400 truncate">{p.name}</div>
+                {p.eliminated || p.chips <= 0 ? (
+                  <div className="text-red-400 font-bold text-sm">OUT</div>
                 ) : (
-                  <span className="text-emerald-400 text-xs">${p.chips}</span>
+                  <div className="text-emerald-400 font-bold text-lg">${p.chips}</div>
                 )}
               </div>
-            </div>
-          );
-        })}
-      </div>
+            ))}
+          </div>
+        </div>
 
-      <div className="flex flex-col gap-2">
-        <button
-          onClick={onNextRound}
-          className="px-8 py-3 bg-gradient-to-r from-amber-500 to-yellow-400 text-gray-900 rounded-xl font-bold text-base shadow-lg hover:from-amber-400 hover:to-yellow-300 transition-all"
-        >
-          Next Round
-        </button>
-        {onReplay && (
-          <button
-            onClick={onReplay}
-            className="px-8 py-2 bg-gradient-to-r from-cyan-600 to-cyan-500 text-white rounded-xl font-bold text-sm shadow-lg hover:from-cyan-500 hover:to-cyan-400 transition-all"
-          >
-            Replay Last Round
-          </button>
-        )}
-        {onNewGame && (
-          <button
-            onClick={onNewGame}
-            className="px-8 py-2 text-gray-400 hover:text-gray-200 text-sm transition-colors"
-          >
-            ← New Game
-          </button>
-        )}
+        {/* All 5 cards: Board + 4 Players */}
+        <div className="flex justify-center items-end gap-2 mb-4">
+          {/* Board Card */}
+          <div className="text-center">
+            <div className="text-xs text-emerald-400 font-bold mb-1">Board</div>
+            <Card card={boardCard} small highlight={rollover} />
+          </div>
+
+          {/* Player Cards */}
+          {players.map((p, i) => {
+            const isWinner = !rollover && (
+              winner.isSplit
+                ? winner.players?.some(wp => wp.name === p.name)
+                : winner.name === p.name
+            );
+
+            return (
+              <div key={i} className={`text-center ${p.folded ? 'opacity-40' : ''}`}>
+                <div className={`text-xs mb-1 truncate max-w-[60px] ${isWinner ? 'text-amber-400 font-bold' : 'text-gray-400'}`}>
+                  {p.name}
+                </div>
+                <Card
+                  card={p.card}
+                  small
+                  highlight={isWinner && !p.folded}
+                />
+              </div>
+            );
+          })}
+        </div>
+
+        <div className="flex flex-col gap-2">
+          {!gameOver && (
+            <button
+              onClick={onNextRound}
+              className="px-8 py-3 bg-gradient-to-r from-amber-500 to-yellow-400 text-gray-900 rounded-xl font-bold text-base shadow-lg hover:from-amber-400 hover:to-yellow-300 transition-all"
+            >
+              Next Round
+            </button>
+          )}
+          {gameOver && (
+            <div className="text-amber-400 font-bold text-lg mb-2">Game Over!</div>
+          )}
+          {onNewGame && (
+            <button
+              onClick={onNewGame}
+              className="px-8 py-2 bg-gradient-to-r from-emerald-600 to-emerald-500 text-white rounded-xl font-bold text-sm shadow-lg hover:from-emerald-500 hover:to-emerald-400 transition-all"
+            >
+              New Game
+            </button>
+          )}
+          {onMainMenu && (
+            <button
+              onClick={onMainMenu}
+              className="px-8 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-xl font-bold text-sm transition-colors"
+            >
+              Main Menu
+            </button>
+          )}
+        </div>
       </div>
     </div>
-  </div>
-);
+  );
+};
 
 type GameState = 'menu' | 'lobby' | 'setup' | 'passing' | 'playing' | 'winner';
 type Action = 'bet' | 'call' | 'raise' | 'check' | 'fold' | 'peek' | 'allIn';
@@ -274,7 +290,7 @@ export default function Kicker() {
   const [isPlayerAI, setIsPlayerAI] = useState([false, false, false, false]);
   const [autoAI, _setAutoAI] = useState(true);
   const [aiSpeed, _setAiSpeed] = useState(1); // 0.5 = fast, 1 = normal, 2 = slow
-  const [aiPendingAction, setAiPendingAction] = useState<{ action: Action; amount?: number } | null>(null);
+  const [_aiPendingAction, setAiPendingAction] = useState<{ action: Action; amount?: number } | null>(null);
   const [lastRaiser, setLastRaiser] = useState(-1);
   const [bettingRoundStarter, setBettingRoundStarter] = useState(0);
   const [dealer, setDealer] = useState(0);
@@ -290,7 +306,7 @@ export default function Kicker() {
     potAfter: number;
     revealedCard?: { playerIndex: number };
   }[]>([]);
-  const [roundStartState, setRoundStartState] = useState<{
+  const [_roundStartState, setRoundStartState] = useState<{
     players: Player[];
     pot: number;
     currentPlayer: number;
@@ -1488,25 +1504,6 @@ export default function Kicker() {
     });
   };
 
-  // Handle "Replay Last Round" - step through recorded history
-  const handleReplayLastRound = () => {
-    if (!roundStartState || roundHistory.length === 0) return;
-
-    // Restore the initial round state
-    setPlayers(roundStartState.players.map(p => ({ ...p })));
-    setPot(roundStartState.pot);
-    setCurrentPlayer(roundStartState.currentPlayer);
-    setCommunalCard(roundStartState.communalCard);
-    setRevealOrder(roundStartState.revealOrder);
-    setMessage('Replaying round...');
-
-    // Clear winner and start replaying
-    setWinner(null);
-    setIsReplaying(true);
-    setReplayIndex(0);
-    setGameState('playing');
-  };
-
   // Advance to next step in replay
   const advanceReplay = () => {
     if (replayIndex >= roundHistory.length) {
@@ -1609,45 +1606,25 @@ export default function Kicker() {
     }
   }, [gameState, currentPlayer, showPassScreen, winner]);
 
-  // AI auto-play effect
+  // AI auto-play effect - instant execution
   useEffect(() => {
     if (!autoAI) return;
     if (gameState !== 'playing' && gameState !== 'passing') return;
     if (!currentPlayerData?.aiLevel) return;
     if (winner) return;
 
-    // Base timings (ms) multiplied by aiSpeed
-    const passDelay = 1200 * aiSpeed;
-    const thinkDelay = 1000 * aiSpeed;
-    const executeDelay = 1500 * aiSpeed;
-
-    // Auto-skip pass screen for AI
+    // Instant - skip pass screen for AI
     if (showPassScreen && gameState === 'passing') {
-      const timer = setTimeout(() => {
-        handleReady();
-      }, passDelay);
-      return () => clearTimeout(timer);
+      handleReady();
+      return;
     }
 
-    // Make AI decision when it's their turn to play
+    // Make AI decision and execute instantly
     if (gameState === 'playing' && !showPassScreen) {
-      if (!aiPendingAction) {
-        // First, compute and show the decision
-        const timer = setTimeout(() => {
-          const decision = makeAIDecision(currentPlayerData, currentPlayer);
-          setAiPendingAction(decision);
-        }, thinkDelay);
-        return () => clearTimeout(timer);
-      } else {
-        // Then execute it after showing the highlight
-        const timer = setTimeout(() => {
-          handleAction(aiPendingAction.action, aiPendingAction.amount || 0);
-          setAiPendingAction(null);
-        }, executeDelay);
-        return () => clearTimeout(timer);
-      }
+      const decision = makeAIDecision(currentPlayerData, currentPlayer);
+      handleAction(decision.action, decision.amount || 0);
     }
-  }, [gameState, currentPlayer, showPassScreen, currentPlayerData?.aiLevel, winner, aiPendingAction, autoAI, aiSpeed]);
+  }, [gameState, currentPlayer, showPassScreen, currentPlayerData?.aiLevel, winner, autoAI]);
 
   // Clear pending action when player changes
   useEffect(() => {
@@ -1928,8 +1905,21 @@ export default function Kicker() {
           boardCard={communalCard}
           onNextRound={handleNextRound}
           rollover={isRollover}
-          onReplay={roundStartState ? handleReplayLastRound : undefined}
           onNewGame={() => {
+            setGameState('lobby');
+            setSeatedPlayers([null, null, null, null]);
+            setLocalPlayerSeat(null);
+            setPlayers([
+              { name: 'Player 1', chips: 50, card: null, revealed: false, folded: false, eliminated: false, peekedCards: [], currentBet: 0, totalRoundBet: 0, allIn: false },
+              { name: 'Player 2', chips: 50, card: null, revealed: false, folded: false, eliminated: false, peekedCards: [], currentBet: 0, totalRoundBet: 0, allIn: false },
+              { name: 'Player 3', chips: 50, card: null, revealed: false, folded: false, eliminated: false, peekedCards: [], currentBet: 0, totalRoundBet: 0, allIn: false },
+              { name: 'Player 4', chips: 50, card: null, revealed: false, folded: false, eliminated: false, peekedCards: [], currentBet: 0, totalRoundBet: 0, allIn: false },
+            ]);
+            setPot(0);
+            setRolloverPot(0);
+            setWinner(null);
+          }}
+          onMainMenu={() => {
             setGameState('menu');
             setSeatedPlayers([null, null, null, null]);
             setLocalPlayerSeat(null);
