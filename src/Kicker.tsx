@@ -153,9 +153,10 @@ interface WinnerScreenProps {
   onNextRound: () => void;
   rollover: boolean;
   onReplay?: () => void;
+  onNewGame?: () => void;
 }
 
-const WinnerScreen = ({ winner, pot, players, boardCard, onNextRound, rollover, onReplay }: WinnerScreenProps) => (
+const WinnerScreen = ({ winner, pot, players, boardCard, onNextRound, rollover, onReplay, onNewGame }: WinnerScreenProps) => (
   <div className="fixed inset-0 bg-gray-900/95 flex flex-col items-center justify-center z-50">
     <div className="text-center p-4 max-w-md">
       {rollover ? (
@@ -229,16 +230,27 @@ const WinnerScreen = ({ winner, pot, players, boardCard, onNextRound, rollover, 
             Replay Last Round
           </button>
         )}
+        {onNewGame && (
+          <button
+            onClick={onNewGame}
+            className="px-8 py-2 text-gray-400 hover:text-gray-200 text-sm transition-colors"
+          >
+            ← New Game
+          </button>
+        )}
       </div>
     </div>
   </div>
 );
 
-type GameState = 'setup' | 'passing' | 'playing' | 'winner';
-type Action = 'bet' | 'call' | 'raise' | 'check' | 'fold' | 'peek';
+type GameState = 'menu' | 'lobby' | 'setup' | 'passing' | 'playing' | 'winner';
+type Action = 'bet' | 'call' | 'raise' | 'check' | 'fold' | 'peek' | 'allIn';
+
+// Turn timer constants
+const TURN_TIME_LIMIT = 15; // seconds
 
 export default function Kicker() {
-  const [gameState, setGameState] = useState<GameState>('setup');
+  const [gameState, setGameState] = useState<GameState>('menu');
   const [deck, setDeck] = useState<CardType[]>([]);
   const [communalCard, setCommunalCard] = useState<CardType | null>(null);
   const [players, setPlayers] = useState<Player[]>([
@@ -285,6 +297,15 @@ export default function Kicker() {
     communalCard: CardType;
     revealOrder: number[];
   } | null>(null);
+
+  // Turn timer state
+  const [turnTimeRemaining, setTurnTimeRemaining] = useState(TURN_TIME_LIMIT);
+  const [turnTimerActive, setTurnTimerActive] = useState(false);
+
+  // Lobby state
+  const [seatedPlayers, setSeatedPlayers] = useState<(string | null)[]>([null, null, null, null]);
+  const [localPlayerSeat, setLocalPlayerSeat] = useState<number | null>(null);
+  const [localPlayerName, setLocalPlayerName] = useState('');
 
   const AI_NAMES = [
     'Alex', 'Sam', 'Jordan', 'Taylor', 'Casey',
@@ -1328,6 +1349,9 @@ export default function Kicker() {
   };
 
   const handleAction = (action: Action, amount = 0) => {
+    // Stop turn timer when action is taken
+    setTurnTimerActive(false);
+
     const player = players[currentPlayer];
     let newPot = pot;
     const toCall = Math.min(currentBetAmount - player.currentBet, player.chips);
@@ -1559,6 +1583,57 @@ export default function Kicker() {
     }
   };
 
+  // Turn timer effect
+  useEffect(() => {
+    if (!turnTimerActive) return;
+    if (gameState !== 'playing') return;
+    if (currentPlayerData?.aiLevel) return; // AI doesn't use timer
+    if (winner) return;
+
+    const interval = setInterval(() => {
+      setTurnTimeRemaining(prev => {
+        if (prev <= 0.1) {
+          // Time's up - auto-fold
+          clearInterval(interval);
+          setTurnTimerActive(false);
+          handleAction('fold');
+          return TURN_TIME_LIMIT;
+        }
+        return prev - 0.1;
+      });
+    }, 100);
+
+    return () => clearInterval(interval);
+  }, [turnTimerActive, gameState, currentPlayerData?.aiLevel, winner]);
+
+  // Start turn timer when it's a human's turn
+  useEffect(() => {
+    if (gameState === 'playing' && !showPassScreen && currentPlayerData && !currentPlayerData.aiLevel && !winner) {
+      // Don't start timer if player has 0 chips (they'll be auto-handled)
+      if (currentPlayerData.chips === 0 && !currentPlayerData.allIn) {
+        // Auto-check for broke players
+        setTimeout(() => {
+          if (currentBetAmount === 0 || currentPlayerData.currentBet >= currentBetAmount) {
+            setMessage(`${currentPlayerData.name} checks (no chips)`);
+            handleAction('check');
+          } else {
+            // Can't match bet, mark as all-in with 0
+            const newPlayers = [...players];
+            newPlayers[currentPlayer].allIn = true;
+            setPlayers(newPlayers);
+            setMessage(`${currentPlayerData.name} is all-in`);
+            advanceToNextPlayer();
+          }
+        }, 800);
+        return;
+      }
+      setTurnTimeRemaining(TURN_TIME_LIMIT);
+      setTurnTimerActive(true);
+    } else {
+      setTurnTimerActive(false);
+    }
+  }, [gameState, currentPlayer, showPassScreen, winner]);
+
   // AI auto-play effect
   useEffect(() => {
     if (!autoAI) return;
@@ -1624,7 +1699,160 @@ export default function Kicker() {
         .font-body { font-family: 'Source Sans Pro', sans-serif; }
       `}</style>
 
-      {showPassScreen && (
+      {/* MENU SCREEN */}
+      {gameState === 'menu' && (
+        <div className="flex-1 flex flex-col items-center justify-center">
+          <div className="text-center">
+            <h1 className="font-display text-6xl sm:text-8xl text-transparent bg-clip-text bg-gradient-to-b from-amber-300 via-yellow-400 to-amber-500 drop-shadow-lg mb-4">
+              KICKER
+            </h1>
+            <p className="text-gray-400 text-lg mb-8">A Game of Cards & Bluffs</p>
+
+            <button
+              onClick={() => setGameState('lobby')}
+              className="px-12 py-4 bg-gradient-to-r from-emerald-600 to-emerald-500 text-white rounded-xl font-bold text-xl shadow-lg hover:from-emerald-500 hover:to-emerald-400 transition-all transform hover:scale-105"
+            >
+              Play
+            </button>
+
+            <div className="mt-12 text-gray-500 text-sm">
+              <p>4 players • 1 card each • Best kicker wins</p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* LOBBY / TABLE SCREEN */}
+      {gameState === 'lobby' && (
+        <div className="flex-1 flex flex-col items-center justify-center p-4">
+          <h2 className="font-display text-2xl text-amber-400 mb-6">Join the Table</h2>
+
+          {/* Enter your name first */}
+          {localPlayerSeat === null && (
+            <div className="mb-6 w-full max-w-xs">
+              <input
+                type="text"
+                value={localPlayerName}
+                onChange={(e) => setLocalPlayerName(e.target.value)}
+                placeholder="Enter your name"
+                className="w-full px-4 py-3 bg-gray-800 border-2 border-gray-600 rounded-lg text-white text-center text-lg focus:border-amber-400 focus:outline-none"
+                maxLength={12}
+              />
+            </div>
+          )}
+
+          {/* Table visualization */}
+          <div className="relative w-72 h-48 mb-6">
+            {/* Table */}
+            <div className="absolute inset-4 bg-emerald-800 rounded-[50%] border-8 border-amber-900 shadow-2xl" />
+
+            {/* Seats */}
+            {[0, 1, 2, 3].map((seatIndex) => {
+              const positions = [
+                { top: '75%', left: '50%', transform: 'translate(-50%, -50%)' }, // Bottom
+                { top: '50%', left: '5%', transform: 'translate(-50%, -50%)' },  // Left
+                { top: '15%', left: '50%', transform: 'translate(-50%, -50%)' }, // Top
+                { top: '50%', left: '95%', transform: 'translate(-50%, -50%)' }, // Right
+              ];
+              const pos = positions[seatIndex];
+              const seated = seatedPlayers[seatIndex];
+              const isLocalSeat = localPlayerSeat === seatIndex;
+
+              return (
+                <div
+                  key={seatIndex}
+                  style={pos}
+                  className="absolute"
+                >
+                  {seated ? (
+                    <div className={`w-16 h-16 rounded-full flex items-center justify-center text-xs font-bold ${isLocalSeat ? 'bg-amber-500 text-gray-900' : 'bg-blue-600 text-white'}`}>
+                      {seated.slice(0, 6)}
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => {
+                        if (localPlayerSeat !== null) return; // Already seated
+                        const name = localPlayerName.trim() || 'Player';
+                        setSeatedPlayers(prev => {
+                          const newSeats = [...prev];
+                          newSeats[seatIndex] = name;
+                          return newSeats;
+                        });
+                        setLocalPlayerSeat(seatIndex);
+
+                        // Auto-fill other seats with AI after a delay
+                        setTimeout(() => {
+                          setSeatedPlayers(prev => {
+                            const newSeats = [...prev];
+                            const usedNames = newSeats.filter(n => n !== null) as string[];
+                            for (let i = 0; i < 4; i++) {
+                              if (newSeats[i] === null) {
+                                const aiName = AI_NAMES.filter(n => !usedNames.includes(n))[Math.floor(Math.random() * (AI_NAMES.length - usedNames.length))] || `AI ${i + 1}`;
+                                newSeats[i] = aiName;
+                                usedNames.push(aiName);
+                              }
+                            }
+                            return newSeats;
+                          });
+                        }, 1500);
+                      }}
+                      disabled={localPlayerSeat !== null || !localPlayerName.trim()}
+                      className={`w-16 h-16 rounded-full border-2 border-dashed flex items-center justify-center text-xs transition-all ${
+                        localPlayerSeat !== null || !localPlayerName.trim()
+                          ? 'border-gray-600 text-gray-600 cursor-not-allowed'
+                          : 'border-emerald-400 text-emerald-400 hover:bg-emerald-400/20 cursor-pointer'
+                      }`}
+                    >
+                      Sit
+                    </button>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Start game button - only show when all seats filled */}
+          {seatedPlayers.every(s => s !== null) && (
+            <button
+              onClick={() => {
+                // Set up the game with seated players
+                const names = seatedPlayers as string[];
+                const isAI = names.map((_, i) => i !== localPlayerSeat);
+                setPlayerNames(names);
+                setIsPlayerAI(isAI);
+                setDealer(Math.floor(Math.random() * 4));
+                setGameState('setup');
+
+                // Auto-start the first round
+                setTimeout(() => {
+                  // This will be handled by the existing startGame logic
+                }, 500);
+              }}
+              className="px-8 py-3 bg-gradient-to-r from-amber-500 to-yellow-400 text-gray-900 rounded-xl font-bold text-lg shadow-lg hover:from-amber-400 hover:to-yellow-300 transition-all animate-pulse"
+            >
+              Start Game
+            </button>
+          )}
+
+          {localPlayerSeat !== null && !seatedPlayers.every(s => s !== null) && (
+            <p className="text-gray-400 text-sm animate-pulse">Waiting for players...</p>
+          )}
+
+          <button
+            onClick={() => {
+              setGameState('menu');
+              setSeatedPlayers([null, null, null, null]);
+              setLocalPlayerSeat(null);
+              setLocalPlayerName('');
+            }}
+            className="mt-6 text-gray-500 hover:text-gray-300 text-sm"
+          >
+            ← Back to Menu
+          </button>
+        </div>
+      )}
+
+      {showPassScreen && (gameState === 'passing' || gameState === 'playing') && (
         players[currentPlayer]?.aiLevel ? (
           // AI player pass screen
           <div className="fixed inset-0 bg-gray-900 flex flex-col items-center justify-center z-50">
@@ -1670,6 +1898,21 @@ export default function Kicker() {
           onNextRound={handleNextRound}
           rollover={isRollover}
           onReplay={roundStartState ? handleReplayLastRound : undefined}
+          onNewGame={() => {
+            setGameState('menu');
+            setSeatedPlayers([null, null, null, null]);
+            setLocalPlayerSeat(null);
+            setLocalPlayerName('');
+            setPlayers([
+              { name: 'Player 1', chips: 50, card: null, revealed: false, folded: false, eliminated: false, peekedCards: [], currentBet: 0, totalRoundBet: 0, allIn: false },
+              { name: 'Player 2', chips: 50, card: null, revealed: false, folded: false, eliminated: false, peekedCards: [], currentBet: 0, totalRoundBet: 0, allIn: false },
+              { name: 'Player 3', chips: 50, card: null, revealed: false, folded: false, eliminated: false, peekedCards: [], currentBet: 0, totalRoundBet: 0, allIn: false },
+              { name: 'Player 4', chips: 50, card: null, revealed: false, folded: false, eliminated: false, peekedCards: [], currentBet: 0, totalRoundBet: 0, allIn: false },
+            ]);
+            setPot(0);
+            setRolloverPot(0);
+            setWinner(null);
+          }}
         />
       )}
 
@@ -1840,6 +2083,26 @@ export default function Kicker() {
                 <li><span className="text-purple-400">Board highest</span> = Rollover</li>
               </ul>
             </div>
+
+            <button
+              onClick={() => {
+                setGameState('menu');
+                setSeatedPlayers([null, null, null, null]);
+                setLocalPlayerSeat(null);
+                setLocalPlayerName('');
+                setPlayers([
+                  { name: 'Player 1', chips: 50, card: null, revealed: false, folded: false, eliminated: false, peekedCards: [], currentBet: 0, totalRoundBet: 0, allIn: false },
+                  { name: 'Player 2', chips: 50, card: null, revealed: false, folded: false, eliminated: false, peekedCards: [], currentBet: 0, totalRoundBet: 0, allIn: false },
+                  { name: 'Player 3', chips: 50, card: null, revealed: false, folded: false, eliminated: false, peekedCards: [], currentBet: 0, totalRoundBet: 0, allIn: false },
+                  { name: 'Player 4', chips: 50, card: null, revealed: false, folded: false, eliminated: false, peekedCards: [], currentBet: 0, totalRoundBet: 0, allIn: false },
+                ]);
+                setPot(0);
+                setRolloverPot(0);
+              }}
+              className="text-gray-500 hover:text-gray-300 text-sm"
+            >
+              ← Back to Menu
+            </button>
           </div>
         )}
 
@@ -1912,6 +2175,20 @@ export default function Kicker() {
                 )}
                 {currentPlayerData.currentBet > 0 && (
                   <span className="text-gray-400 ml-1 text-xs">(${currentPlayerData.currentBet})</span>
+                )}
+                {/* Turn Timer */}
+                {turnTimerActive && !currentPlayerData.aiLevel && (
+                  <div className="mt-1">
+                    <div className="relative h-2 bg-gray-700 rounded-full overflow-hidden">
+                      <div
+                        className={`absolute left-0 top-0 h-full transition-all duration-100 ${turnTimeRemaining < 5 ? 'bg-red-500' : 'bg-amber-400'}`}
+                        style={{ width: `${(turnTimeRemaining / TURN_TIME_LIMIT) * 100}%` }}
+                      />
+                    </div>
+                    <span className={`text-xs ${turnTimeRemaining < 5 ? 'text-red-400' : 'text-gray-400'}`}>
+                      {Math.ceil(turnTimeRemaining)}s
+                    </span>
+                  </div>
                 )}
               </div>
 
