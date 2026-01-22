@@ -272,8 +272,8 @@ export default function Kicker() {
   const [isRollover, setIsRollover] = useState(false);
   const [playerNames, setPlayerNames] = useState(['Player 1', 'Player 2', 'Player 3', 'Player 4']);
   const [isPlayerAI, setIsPlayerAI] = useState([false, false, false, false]);
-  const [autoAI, setAutoAI] = useState(true);
-  const [aiSpeed, setAiSpeed] = useState(1); // 0.5 = fast, 1 = normal, 2 = slow
+  const [autoAI, _setAutoAI] = useState(true);
+  const [aiSpeed, _setAiSpeed] = useState(1); // 0.5 = fast, 1 = normal, 2 = slow
   const [aiPendingAction, setAiPendingAction] = useState<{ action: Action; amount?: number } | null>(null);
   const [lastRaiser, setLastRaiser] = useState(-1);
   const [bettingRoundStarter, setBettingRoundStarter] = useState(0);
@@ -1569,20 +1569,6 @@ export default function Kicker() {
 
   const { boardHighest } = getHighlightInfo();
 
-  // Function to trigger AI turn - shows decision first, then executes
-  const triggerAITurn = () => {
-    if (!currentPlayerData?.aiLevel) return;
-    if (aiPendingAction) {
-      // Execute the pending action
-      handleAction(aiPendingAction.action, aiPendingAction.amount || 0);
-      setAiPendingAction(null);
-    } else {
-      // Compute and show the decision
-      const decision = makeAIDecision(currentPlayerData, currentPlayer);
-      setAiPendingAction(decision);
-    }
-  };
-
   // Turn timer effect
   useEffect(() => {
     if (!turnTimerActive) return;
@@ -1780,21 +1766,37 @@ export default function Kicker() {
                         });
                         setLocalPlayerSeat(seatIndex);
 
-                        // Auto-fill other seats with AI after a delay
-                        setTimeout(() => {
-                          setSeatedPlayers(prev => {
-                            const newSeats = [...prev];
-                            const usedNames = newSeats.filter(n => n !== null) as string[];
-                            for (let i = 0; i < 4; i++) {
-                              if (newSeats[i] === null) {
-                                const aiName = AI_NAMES.filter(n => !usedNames.includes(n))[Math.floor(Math.random() * (AI_NAMES.length - usedNames.length))] || `AI ${i + 1}`;
-                                newSeats[i] = aiName;
-                                usedNames.push(aiName);
-                              }
-                            }
-                            return newSeats;
-                          });
-                        }, 1500);
+                        // Auto-fill other seats with AI one by one with staggered delays
+                        const emptySeats = [0, 1, 2, 3].filter(i => i !== seatIndex);
+                        // Shuffle the order AI players join
+                        emptySeats.sort(() => Math.random() - 0.5);
+
+                        // Generate random delays that total under 15 seconds
+                        // First player joins after 1-3 seconds, others follow with 2-5 second gaps
+                        let cumulativeDelay = 1000 + Math.random() * 2000; // 1-3 seconds for first
+                        const usedNamesTracker: string[] = [name];
+
+                        emptySeats.forEach((emptySeatIndex, idx) => {
+                          const delay = cumulativeDelay;
+                          setTimeout(() => {
+                            setSeatedPlayers(prev => {
+                              const newSeats = [...prev];
+                              // Get currently used names
+                              const currentUsedNames = newSeats.filter(n => n !== null) as string[];
+                              const availableNames = AI_NAMES.filter(n => !currentUsedNames.includes(n) && !usedNamesTracker.includes(n));
+                              const aiName = availableNames[Math.floor(Math.random() * availableNames.length)] || `Player ${emptySeatIndex + 1}`;
+                              usedNamesTracker.push(aiName);
+                              newSeats[emptySeatIndex] = aiName;
+                              return newSeats;
+                            });
+                          }, delay);
+
+                          // Add 2-5 seconds for next player (but keep total under 15s)
+                          const maxRemaining = 14000 - cumulativeDelay;
+                          const remainingPlayers = emptySeats.length - idx - 1;
+                          const maxGap = remainingPlayers > 0 ? Math.min(5000, maxRemaining / remainingPlayers) : 0;
+                          cumulativeDelay += 2000 + Math.random() * Math.max(0, maxGap - 2000);
+                        });
                       }}
                       disabled={localPlayerSeat !== null || !localPlayerName.trim()}
                       className={`w-16 h-16 rounded-full border-2 border-dashed flex items-center justify-center text-xs transition-all ${
@@ -1854,30 +1856,20 @@ export default function Kicker() {
 
       {showPassScreen && (gameState === 'passing' || gameState === 'playing') && (
         players[currentPlayer]?.aiLevel ? (
-          // AI player pass screen
+          // Other player's turn - auto-advance
           <div className="fixed inset-0 bg-gray-900 flex flex-col items-center justify-center z-50">
             <div className="text-center p-4">
               {isReplaying && (
-                <div className="text-cyan-300 text-xs mb-2 px-3 py-1 bg-cyan-900/60 rounded-full inline-block">
+                <div className="text-amber-300 text-xs mb-2 px-3 py-1 bg-amber-900/60 rounded-full inline-block">
                   Replaying round...
                 </div>
               )}
-              <h2 className="font-display text-2xl text-cyan-400 mb-2">{players[currentPlayer].name}'s Turn</h2>
-              <p className="text-gray-400 mb-1 text-sm">({players[currentPlayer].aiLevel} AI)</p>
-              {autoAI ? (
-                <p className="text-cyan-400 animate-pulse text-sm mt-4">Starting turn...</p>
-              ) : (
-                <button
-                  onClick={handleReady}
-                  className="mt-4 px-8 py-3 bg-gradient-to-r from-cyan-600 to-cyan-500 text-white rounded-xl font-bold text-base shadow-lg hover:from-cyan-500 hover:to-cyan-400 transition-all"
-                >
-                  Next
-                </button>
-              )}
+              <h2 className="font-display text-2xl text-amber-400 mb-4">{players[currentPlayer].name}'s Turn</h2>
+              <div className="text-gray-400 animate-pulse text-sm">Waiting...</div>
               {isReplaying && (
                 <button
                   onClick={handleCancelReplay}
-                  className="mt-4 ml-2 px-6 py-2 bg-red-600 hover:bg-red-500 text-white rounded-xl font-bold text-sm transition-colors"
+                  className="mt-4 px-6 py-2 bg-red-600 hover:bg-red-500 text-white rounded-xl font-bold text-sm transition-colors"
                 >
                   Stop Replay
                 </button>
@@ -2137,42 +2129,12 @@ export default function Kicker() {
               </div>
             </div>
 
-            {/* AI Controls */}
-            {players.some(p => p.aiLevel) && (
-              <div className="flex justify-center items-center gap-2 mb-1 flex-shrink-0">
-                <button
-                  onClick={() => setAutoAI(!autoAI)}
-                  className={`px-3 py-0.5 rounded-full text-xs font-medium transition-colors ${
-                    autoAI ? 'bg-cyan-600 text-white' : 'bg-gray-700 text-gray-300'
-                  }`}
-                >
-                  {autoAI ? 'Auto' : 'Manual'}
-                </button>
-                <div className="flex items-center gap-1">
-                  <button
-                    onClick={() => setAiSpeed(Math.max(0.25, aiSpeed - 0.25))}
-                    className="w-6 h-6 rounded-full bg-gray-700 hover:bg-gray-600 text-white text-sm font-bold"
-                  >-</button>
-                  <span className="text-xs text-gray-400 w-8 text-center">
-                    {aiSpeed === 0.25 ? '4x' : aiSpeed === 0.5 ? '2x' : aiSpeed === 0.75 ? '1.3x' : aiSpeed === 1 ? '1x' : aiSpeed === 1.5 ? '.7x' : '.5x'}
-                  </span>
-                  <button
-                    onClick={() => setAiSpeed(Math.min(2, aiSpeed + 0.25))}
-                    className="w-6 h-6 rounded-full bg-gray-700 hover:bg-gray-600 text-white text-sm font-bold"
-                  >+</button>
-                </div>
-              </div>
-            )}
-
             <div className="text-center mb-2 text-xs text-gray-300 flex-shrink-0">{message}</div>
 
             {/* Current Player Actions */}
             <div className="p-2 bg-amber-900/40 rounded-lg border border-amber-400 mb-2 flex-shrink-0">
               <div className="text-center mb-1">
                 <span className="text-amber-400 font-bold">{currentPlayerData.name}'s Turn</span>
-                {currentPlayerData.aiLevel && (
-                  <span className="text-cyan-400 ml-1 text-xs">({currentPlayerData.aiLevel})</span>
-                )}
                 {currentPlayerData.currentBet > 0 && (
                   <span className="text-gray-400 ml-1 text-xs">(${currentPlayerData.currentBet})</span>
                 )}
@@ -2192,101 +2154,10 @@ export default function Kicker() {
                 )}
               </div>
 
-              {/* AI Actions Display */}
+              {/* Other Player's Turn Display */}
               {currentPlayerData.aiLevel && (
-                <div className="space-y-1">
-                  {!aiPendingAction && (
-                    <div className="text-center py-1">
-                      {autoAI ? (
-                        <div className="text-cyan-400 text-xs animate-pulse">AI thinking...</div>
-                      ) : (
-                        <button onClick={triggerAITurn} className="px-4 py-1 bg-cyan-600 hover:bg-cyan-500 text-white rounded font-bold text-xs">
-                          Next
-                        </button>
-                      )}
-                    </div>
-                  )}
-
-                  {aiPendingAction && (
-                    <>
-                      <div className="text-center text-cyan-400 text-[10px]">{currentPlayerData.name} chooses...</div>
-
-                      {canBet && (
-                        <div className="grid grid-cols-3 gap-1">
-                          {[1, 2, 3].map(amt => (
-                            <div key={amt} className={`px-1 py-1 rounded text-xs font-bold text-center transition-all duration-300 ${
-                              aiPendingAction.action === 'bet' && aiPendingAction.amount === amt
-                                ? 'bg-green-400 text-gray-900 ring-1 ring-green-300 animate-pulse'
-                                : 'bg-green-900/50 text-green-300/50'
-                            }`}>
-                              ${amt}
-                            </div>
-                          ))}
-                        </div>
-                      )}
-
-                      {canCall && (
-                        <div className={`w-full px-1 py-1 rounded text-xs font-bold text-center transition-all duration-300 ${
-                          aiPendingAction.action === 'call'
-                            ? 'bg-blue-400 text-gray-900 ring-1 ring-blue-300 animate-pulse'
-                            : 'bg-blue-900/50 text-blue-300/50'
-                        }`}>
-                          Call ${toCall}
-                        </div>
-                      )}
-
-                      {canRaise && (
-                        <div className="grid grid-cols-3 gap-1">
-                          {[1, 2, 3].map(amt => (
-                            <div
-                              key={amt}
-                              className={`px-1 py-1 rounded text-xs font-bold text-center transition-all duration-300 ${
-                                aiPendingAction.action === 'raise' && aiPendingAction.amount === amt
-                                  ? 'bg-orange-400 text-gray-900 ring-1 ring-orange-300 animate-pulse'
-                                  : 'bg-orange-900/50 text-orange-300/50'
-                              }`}
-                            >
-                              +${amt}
-                            </div>
-                          ))}
-                        </div>
-                      )}
-
-                      <div className={`grid ${canCheck ? 'grid-cols-2' : 'grid-cols-1'} gap-1`}>
-                        {canCheck && (
-                          <div
-                            className={`px-1 py-1 rounded text-xs font-bold text-center transition-all duration-300 ${
-                              aiPendingAction.action === 'check'
-                                ? 'bg-gray-400 text-gray-900 ring-1 ring-gray-300 animate-pulse'
-                                : 'bg-gray-800/50 text-gray-400/50'
-                            }`}
-                          >
-                            Check
-                          </div>
-                        )}
-                        <div
-                          className={`px-1 py-1 rounded text-xs font-bold text-center transition-all duration-300 ${
-                            aiPendingAction.action === 'fold'
-                              ? 'bg-red-400 text-gray-900 ring-1 ring-red-300 animate-pulse'
-                              : 'bg-red-900/50 text-red-300/50'
-                          }`}
-                        >
-                          Fold
-                        </div>
-                      </div>
-
-                      {!autoAI && (
-                        <div className="text-center mt-1">
-                          <button
-                            onClick={triggerAITurn}
-                            className="px-4 py-1 bg-cyan-600 hover:bg-cyan-500 text-white rounded font-bold text-xs transition-colors"
-                          >
-                            Execute
-                          </button>
-                        </div>
-                      )}
-                    </>
-                  )}
+                <div className="text-center py-2">
+                  <div className="text-gray-400 text-sm animate-pulse">Thinking...</div>
                 </div>
               )}
 
