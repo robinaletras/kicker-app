@@ -1966,15 +1966,10 @@ export default function Kicker() {
                           value={name}
                           onChange={(e) => handleNameChange(i, e.target.value)}
                           onFocus={(e) => {
-                            if (name === `Player ${i + 1}` || isPlayerAI[i]) {
+                            if (name === `Player ${i + 1}`) {
                               const newNames = [...playerNames];
                               newNames[i] = '';
                               setPlayerNames(newNames);
-                              if (isPlayerAI[i]) {
-                                const newIsAI = [...isPlayerAI];
-                                newIsAI[i] = false;
-                                setIsPlayerAI(newIsAI);
-                              }
                             }
                             e.target.select();
                           }}
@@ -1985,14 +1980,9 @@ export default function Kicker() {
                               setPlayerNames(newNames);
                             }
                           }}
-                          className={`w-full px-4 py-3 bg-gray-800 border-2 rounded-lg text-white text-base ${isPlayerAI[i] ? 'border-cyan-400' : i === dealer ? 'border-amber-400' : 'border-gray-700'}`}
+                          className={`w-full px-4 py-3 bg-gray-800 border-2 rounded-lg text-white text-base ${i === dealer ? 'border-amber-400' : 'border-gray-700'}`}
                           placeholder={`Player ${i + 1}`}
                         />
-                        {isPlayerAI[i] && (
-                          <span className="absolute -top-2 -left-1 bg-cyan-500 text-gray-900 text-xs font-bold px-2 py-0.5 rounded-full">
-                            AI
-                          </span>
-                        )}
                         {i === dealer && (
                           <span className="absolute -top-2 -right-1 bg-amber-500 text-gray-900 text-xs font-bold px-2 py-0.5 rounded-full">
                             D
@@ -2013,15 +2003,10 @@ export default function Kicker() {
                           value={name}
                           onChange={(e) => handleNameChange(i, e.target.value)}
                           onFocus={(e) => {
-                            if (name === `Player ${i + 1}` || isPlayerAI[i]) {
+                            if (name === `Player ${i + 1}`) {
                               const newNames = [...playerNames];
                               newNames[i] = '';
                               setPlayerNames(newNames);
-                              if (isPlayerAI[i]) {
-                                const newIsAI = [...isPlayerAI];
-                                newIsAI[i] = false;
-                                setIsPlayerAI(newIsAI);
-                              }
                             }
                             e.target.select();
                           }}
@@ -2032,14 +2017,9 @@ export default function Kicker() {
                               setPlayerNames(newNames);
                             }
                           }}
-                          className={`w-full px-4 py-3 bg-gray-800 border-2 rounded-lg text-white text-base ${isPlayerAI[i] ? 'border-cyan-400' : i === dealer ? 'border-amber-400' : 'border-gray-700'}`}
+                          className={`w-full px-4 py-3 bg-gray-800 border-2 rounded-lg text-white text-base ${i === dealer ? 'border-amber-400' : 'border-gray-700'}`}
                           placeholder={`Player ${i + 1}`}
                         />
-                        {isPlayerAI[i] && (
-                          <span className="absolute -top-2 -left-1 bg-cyan-500 text-gray-900 text-xs font-bold px-2 py-0.5 rounded-full">
-                            AI
-                          </span>
-                        )}
                         {i === dealer && (
                           <span className="absolute -top-2 -right-1 bg-amber-500 text-gray-900 text-xs font-bold px-2 py-0.5 rounded-full">
                             D
@@ -2051,7 +2031,7 @@ export default function Kicker() {
                 </div>
               </div>
               <div className="mt-3 text-center text-sm text-gray-400">
-                {playerNames[dealer]} deals • Type "AI" for bots
+                {playerNames[dealer]} deals
               </div>
             </div>
 
