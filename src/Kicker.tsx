@@ -272,7 +272,7 @@ export default function Kicker() {
   const [isRollover, setIsRollover] = useState(false);
   const [playerNames, setPlayerNames] = useState(['Player 1', 'Player 2', 'Player 3', 'Player 4']);
   const [isPlayerAI, setIsPlayerAI] = useState([false, false, false, false]);
-  const [autoAI, _setAutoAI] = useState(true);
+  const [autoAI, _setAutoAI] = useState(false); // Manual mode - user clicks to advance
   const [aiSpeed, _setAiSpeed] = useState(1); // 0.5 = fast, 1 = normal, 2 = slow
   const [aiPendingAction, setAiPendingAction] = useState<{ action: Action; amount?: number } | null>(null);
   const [lastRaiser, setLastRaiser] = useState(-1);
@@ -1895,7 +1895,7 @@ export default function Kicker() {
 
       {showPassScreen && (gameState === 'passing' || gameState === 'playing') && (
         players[currentPlayer]?.aiLevel ? (
-          // Other player's turn - auto-advance
+          // Other player's turn - click to continue
           <div className="fixed inset-0 bg-gray-900 flex flex-col items-center justify-center z-50">
             <div className="text-center p-4">
               {isReplaying && (
@@ -1904,11 +1904,16 @@ export default function Kicker() {
                 </div>
               )}
               <h2 className="font-display text-2xl text-amber-400 mb-4">{players[currentPlayer].name}'s Turn</h2>
-              <div className="text-gray-400 animate-pulse text-sm">Waiting...</div>
+              <button
+                onClick={handleReady}
+                className="px-8 py-3 bg-gradient-to-r from-emerald-600 to-emerald-500 text-white rounded-xl font-bold text-base shadow-lg hover:from-emerald-500 hover:to-emerald-400 transition-all"
+              >
+                Next
+              </button>
               {isReplaying && (
                 <button
                   onClick={handleCancelReplay}
-                  className="mt-4 px-6 py-2 bg-red-600 hover:bg-red-500 text-white rounded-xl font-bold text-sm transition-colors"
+                  className="mt-4 ml-2 px-6 py-2 bg-red-600 hover:bg-red-500 text-white rounded-xl font-bold text-sm transition-colors"
                 >
                   Stop Replay
                 </button>
@@ -2014,7 +2019,16 @@ export default function Kicker() {
               {/* Other Player's Turn Display */}
               {currentPlayerData.aiLevel && (
                 <div className="text-center py-2">
-                  <div className="text-gray-400 text-sm animate-pulse">Thinking...</div>
+                  <button
+                    onClick={() => {
+                      // Make AI decision and execute it
+                      const decision = makeAIDecision(currentPlayerData, currentPlayer);
+                      handleAction(decision.action, decision.amount || 0);
+                    }}
+                    className="px-6 py-2 bg-gradient-to-r from-emerald-600 to-emerald-500 text-white rounded-lg font-bold text-sm shadow-lg hover:from-emerald-500 hover:to-emerald-400 transition-all"
+                  >
+                    Next
+                  </button>
                 </div>
               )}
 
