@@ -1898,7 +1898,7 @@ export default function Kicker() {
                     : 'bg-gray-700 text-gray-500 cursor-not-allowed'
                 }`}
               >
-                Play vs AI
+                Play
               </button>
 
               <button
