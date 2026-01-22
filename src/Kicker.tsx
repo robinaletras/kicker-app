@@ -314,109 +314,6 @@ export default function Kicker() {
     'Kelly', 'Logan', 'Max', 'Peyton', 'Reese'
   ];
 
-  const getRandomAIName = (excludeNames: string[]): string => {
-    const available = AI_NAMES.filter(n => !excludeNames.includes(n));
-    if (available.length === 0) return AI_NAMES[Math.floor(Math.random() * AI_NAMES.length)];
-    return available[Math.floor(Math.random() * available.length)];
-  };
-
-  const handleNameChange = (index: number, value: string) => {
-    const newNames = [...playerNames];
-    const newIsAI = [...isPlayerAI];
-
-    if (value.toLowerCase() === 'ai') {
-      // Get names already used by other AI players
-      const usedNames = playerNames.filter((_, i) => i !== index && isPlayerAI[i]);
-      newNames[index] = getRandomAIName(usedNames);
-      newIsAI[index] = true;
-    } else {
-      newNames[index] = value;
-      newIsAI[index] = false;
-    }
-
-    setPlayerNames(newNames);
-    setIsPlayerAI(newIsAI);
-  };
-
-  const getRandomAILevel = (): AISkillLevel => {
-    const levels: AISkillLevel[] = ['cautious', 'random', 'aggressive'];
-    return levels[Math.floor(Math.random() * levels.length)];
-  };
-
-  const dealCards = () => {
-    const newDeck = createDeck();
-    const communal = newDeck.pop()!;
-
-    const order: number[] = [];
-    for (let i = 1; i <= 4; i++) {
-      order.push((dealer + i) % 4);
-    }
-    setRevealOrder(order);
-
-    // Check who can afford to play (need at least 1 chip for ante)
-    const newPlayers = players.map((p, i) => {
-      const canPlay = p.chips >= 1 && !p.eliminated;
-      return {
-        ...p,
-        name: playerNames[i],
-        card: canPlay ? newDeck.pop()! : null,
-        revealed: false,
-        folded: !canPlay,
-        eliminated: p.eliminated || p.chips < 1,
-        peekedCards: [],
-        currentBet: 0,
-        totalRoundBet: 0,
-        allIn: false,
-        aiLevel: isPlayerAI[i] ? getRandomAILevel() : undefined,
-      };
-    });
-
-    // Collect antes only from players who can play
-    const playingCount = newPlayers.filter(p => !p.eliminated && !p.folded).length;
-    const antePlayers = newPlayers.map(p =>
-      (!p.eliminated && !p.folded) ? { ...p, chips: p.chips - 1, totalRoundBet: 1 } : p
-    );
-
-    // Find first non-eliminated player after dealer
-    let firstToAct = (dealer + 1) % 4;
-    let attempts = 0;
-    while ((antePlayers[firstToAct].eliminated || antePlayers[firstToAct].folded) && attempts < 4) {
-      firstToAct = (firstToAct + 1) % 4;
-      attempts++;
-    }
-
-    const initialPot = playingCount + rolloverPot;
-
-    // Save initial state for replay feature
-    setRoundStartState({
-      players: antePlayers.map(p => ({ ...p })),
-      pot: initialPot,
-      currentPlayer: firstToAct,
-      communalCard: communal,
-      revealOrder: order,
-    });
-
-    setDeck(newDeck);
-    setCommunalCard(communal);
-    setPlayers(antePlayers);
-    setPot(initialPot);
-    setSidePots([]);
-    setAiRaiseCount({});
-    setCurrentPlayer(firstToAct);
-    setCurrentBetAmount(0);
-    setRevealPhase(0);
-    setMessage(`${playerNames[dealer]} is dealer. Communal: ${communal.rank}${communal.suit}${rolloverPot > 0 ? ` (+$${rolloverPot} rollover!)` : ''}`);
-    setShowPassScreen(true);
-    setGameState('passing');
-    setWinner(null);
-    setIsRollover(false);
-    setLastRaiser(-1);
-    setBettingRoundStarter(firstToAct);
-    setIsReplaying(false);
-    setReplayIndex(0);
-    setRoundHistory([]);
-  };
-
   const handleReady = () => {
     setShowPassScreen(false);
     setGameState('playing');
@@ -1496,37 +1393,99 @@ export default function Kicker() {
   };
 
   const handleNextRound = () => {
-    // Eliminate players with no chips
-    const resetPlayers = players.map(p => ({
-      ...p,
-      card: null,
-      revealed: false,
-      folded: false,
-      eliminated: p.eliminated || p.chips <= 0,
-      peekedCards: [],
-      currentBet: 0,
-      totalRoundBet: 0,
-      allIn: false,
-    }));
-    setPlayers(resetPlayers);
-    setSidePots([]);
-    setAiRaiseCount({});
+    // Check for game over (only 1 player with chips left)
+    const playersWithChips = players.filter(p => !p.eliminated && p.chips > 0);
+    if (playersWithChips.length <= 1) {
+      // Game over - go back to menu
+      setGameState('menu');
+      setSeatedPlayers([null, null, null, null]);
+      setLocalPlayerSeat(null);
+      setLocalPlayerName('');
+      setPlayers([
+        { name: 'Player 1', chips: 50, card: null, revealed: false, folded: false, eliminated: false, peekedCards: [], currentBet: 0, totalRoundBet: 0, allIn: false },
+        { name: 'Player 2', chips: 50, card: null, revealed: false, folded: false, eliminated: false, peekedCards: [], currentBet: 0, totalRoundBet: 0, allIn: false },
+        { name: 'Player 3', chips: 50, card: null, revealed: false, folded: false, eliminated: false, peekedCards: [], currentBet: 0, totalRoundBet: 0, allIn: false },
+        { name: 'Player 4', chips: 50, card: null, revealed: false, folded: false, eliminated: false, peekedCards: [], currentBet: 0, totalRoundBet: 0, allIn: false },
+      ]);
+      setPot(0);
+      setRolloverPot(0);
+      setWinner(null);
+      return;
+    }
 
     // Find next non-eliminated dealer
     let nextDealer = (dealer + 1) % 4;
     let attempts = 0;
-    while (resetPlayers[nextDealer].eliminated && attempts < 4) {
+    while ((players[nextDealer].eliminated || players[nextDealer].chips <= 0) && attempts < 4) {
       nextDealer = (nextDealer + 1) % 4;
       attempts++;
     }
+
+    // Deal new round directly
+    const newDeck = createDeck();
+    const communal = newDeck.pop()!;
+
+    const order: number[] = [];
+    for (let j = 1; j <= 4; j++) {
+      order.push((nextDealer + j) % 4);
+    }
+    setRevealOrder(order);
+
+    const newPlayers = players.map((p, i) => {
+      const canPlay = p.chips >= 1 && !p.eliminated && p.chips > 0;
+      return {
+        ...p,
+        card: canPlay ? newDeck.pop()! : null,
+        revealed: false,
+        folded: !canPlay,
+        eliminated: p.eliminated || p.chips <= 0,
+        peekedCards: [] as CardType[],
+        currentBet: 0,
+        totalRoundBet: canPlay ? 1 : 0,
+        allIn: false,
+        chips: canPlay ? p.chips - 1 : p.chips, // ante
+        aiLevel: isPlayerAI[i] ? (['cautious', 'random', 'aggressive'][Math.floor(Math.random() * 3)] as AISkillLevel) : p.aiLevel,
+      };
+    });
+
+    const playingCount = newPlayers.filter(p => !p.eliminated && !p.folded).length;
+    let firstToAct = (nextDealer + 1) % 4;
+    let findAttempts = 0;
+    while ((newPlayers[firstToAct].eliminated || newPlayers[firstToAct].folded) && findAttempts < 4) {
+      firstToAct = (firstToAct + 1) % 4;
+      findAttempts++;
+    }
+
+    const initialPot = playingCount + rolloverPot;
+
     setDealer(nextDealer);
-    setGameState('setup');
-    setShowPassScreen(false);
-    setWinner(null);
-    setPot(0);
+    setDeck(newDeck);
+    setCommunalCard(communal);
+    setPlayers(newPlayers);
+    setPot(initialPot);
+    setSidePots([]);
+    setAiRaiseCount({});
+    setCurrentPlayer(firstToAct);
     setCurrentBetAmount(0);
+    setRevealPhase(0);
+    setMessage(`${playerNames[nextDealer]} is dealer. Communal: ${communal.rank}${communal.suit}${rolloverPot > 0 ? ` (+$${rolloverPot} rollover!)` : ''}`);
+    setRolloverPot(0);
+    setShowPassScreen(true);
+    setGameState('passing');
+    setWinner(null);
     setIsRollover(false);
+    setLastRaiser(-1);
+    setBettingRoundStarter(firstToAct);
     setIsReplaying(false);
+    setReplayIndex(0);
+    setRoundHistory([]);
+    setRoundStartState({
+      players: newPlayers.map(p => ({ ...p })),
+      pot: initialPot,
+      currentPlayer: firstToAct,
+      communalCard: communal,
+      revealOrder: order,
+    });
   };
 
   // Handle "Replay Last Round" - step through recorded history
@@ -1852,13 +1811,63 @@ export default function Kicker() {
                 const isAI = names.map((_, i) => i !== localPlayerSeat);
                 setPlayerNames(names);
                 setIsPlayerAI(isAI);
-                setDealer(Math.floor(Math.random() * 4));
-                setGameState('setup');
+                const newDealer = Math.floor(Math.random() * 4);
+                setDealer(newDealer);
 
-                // Auto-start the first round
-                setTimeout(() => {
-                  // This will be handled by the existing startGame logic
-                }, 500);
+                // Initialize players and deal cards directly
+                const newDeck = createDeck();
+                const communal = newDeck.pop()!;
+
+                const order: number[] = [];
+                for (let j = 1; j <= 4; j++) {
+                  order.push((newDealer + j) % 4);
+                }
+                setRevealOrder(order);
+
+                const newPlayers = names.map((name, i) => ({
+                  name,
+                  chips: 50 - 1, // minus ante
+                  card: newDeck.pop()!,
+                  revealed: false,
+                  folded: false,
+                  eliminated: false,
+                  peekedCards: [] as CardType[],
+                  currentBet: 0,
+                  totalRoundBet: 1, // ante
+                  allIn: false,
+                  aiLevel: isAI[i] ? (['cautious', 'random', 'aggressive'][Math.floor(Math.random() * 3)] as AISkillLevel) : undefined,
+                }));
+
+                // Find first player after dealer
+                let firstToAct = (newDealer + 1) % 4;
+
+                setDeck(newDeck);
+                setCommunalCard(communal);
+                setPlayers(newPlayers);
+                setPot(4 + rolloverPot); // 4 antes
+                setSidePots([]);
+                setAiRaiseCount({});
+                setCurrentPlayer(firstToAct);
+                setCurrentBetAmount(0);
+                setRevealPhase(0);
+                setMessage(`${names[newDealer]} is dealer. Communal: ${communal.rank}${communal.suit}${rolloverPot > 0 ? ` (+$${rolloverPot} rollover!)` : ''}`);
+                setRolloverPot(0);
+                setShowPassScreen(true);
+                setGameState('passing');
+                setWinner(null);
+                setIsRollover(false);
+                setLastRaiser(-1);
+                setBettingRoundStarter(firstToAct);
+                setIsReplaying(false);
+                setReplayIndex(0);
+                setRoundHistory([]);
+                setRoundStartState({
+                  players: newPlayers.map(p => ({ ...p })),
+                  pot: 4 + rolloverPot,
+                  currentPlayer: firstToAct,
+                  communalCard: communal,
+                  revealOrder: order,
+                });
               }}
               className="px-8 py-3 bg-gradient-to-r from-amber-500 to-yellow-400 text-gray-900 rounded-xl font-bold text-lg shadow-lg hover:from-amber-400 hover:to-yellow-300 transition-all animate-pulse"
             >
@@ -1944,169 +1953,7 @@ export default function Kicker() {
           <h1 className="font-display text-xl bg-gradient-to-r from-amber-400 to-yellow-200 bg-clip-text text-transparent">
             KICKER
           </h1>
-          {rolloverPot > 0 && gameState === 'setup' && (
-            <div className="text-purple-400 font-bold text-xs">+${rolloverPot} rollover!</div>
-          )}
         </div>
-
-        {gameState === 'setup' && (
-          <div className="flex-1 flex flex-col gap-2 overflow-hidden">
-            <div className="p-4 bg-gray-900/80 rounded-xl flex-shrink-0">
-              <h3 className="font-semibold text-amber-400 mb-3 text-base">Player Names</h3>
-              {/* Mobile: 1 column, Desktop: 2 columns with 1,2 left and 3,4 right */}
-              <div className="flex flex-col sm:flex-row gap-4">
-                {/* Left column: Players 1 & 2 */}
-                <div className="flex-1 flex flex-col gap-3">
-                  {[0, 1].map((i) => {
-                    const name = playerNames[i];
-                    return (
-                      <div key={i} className="relative">
-                        <input
-                          type="text"
-                          value={name}
-                          onChange={(e) => handleNameChange(i, e.target.value)}
-                          onFocus={(e) => {
-                            if (name === `Player ${i + 1}`) {
-                              const newNames = [...playerNames];
-                              newNames[i] = '';
-                              setPlayerNames(newNames);
-                            }
-                            e.target.select();
-                          }}
-                          onBlur={() => {
-                            if (name.trim() === '') {
-                              const newNames = [...playerNames];
-                              newNames[i] = `Player ${i + 1}`;
-                              setPlayerNames(newNames);
-                            }
-                          }}
-                          className={`w-full px-4 py-3 bg-gray-800 border-2 rounded-lg text-white text-base ${i === dealer ? 'border-amber-400' : 'border-gray-700'}`}
-                          placeholder={`Player ${i + 1}`}
-                        />
-                        {i === dealer && (
-                          <span className="absolute -top-2 -right-1 bg-amber-500 text-gray-900 text-xs font-bold px-2 py-0.5 rounded-full">
-                            D
-                          </span>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-                {/* Right column: Players 3 & 4 */}
-                <div className="flex-1 flex flex-col gap-3">
-                  {[2, 3].map((i) => {
-                    const name = playerNames[i];
-                    return (
-                      <div key={i} className="relative">
-                        <input
-                          type="text"
-                          value={name}
-                          onChange={(e) => handleNameChange(i, e.target.value)}
-                          onFocus={(e) => {
-                            if (name === `Player ${i + 1}`) {
-                              const newNames = [...playerNames];
-                              newNames[i] = '';
-                              setPlayerNames(newNames);
-                            }
-                            e.target.select();
-                          }}
-                          onBlur={() => {
-                            if (name.trim() === '') {
-                              const newNames = [...playerNames];
-                              newNames[i] = `Player ${i + 1}`;
-                              setPlayerNames(newNames);
-                            }
-                          }}
-                          className={`w-full px-4 py-3 bg-gray-800 border-2 rounded-lg text-white text-base ${i === dealer ? 'border-amber-400' : 'border-gray-700'}`}
-                          placeholder={`Player ${i + 1}`}
-                        />
-                        {i === dealer && (
-                          <span className="absolute -top-2 -right-1 bg-amber-500 text-gray-900 text-xs font-bold px-2 py-0.5 rounded-full">
-                            D
-                          </span>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-              <div className="mt-3 text-center text-sm text-gray-400">
-                {playerNames[dealer]} deals
-              </div>
-            </div>
-
-            {players[0].chips !== 50 && (
-              <div className="p-2 bg-gray-900/80 rounded-xl">
-                <div className="grid grid-cols-4 gap-1">
-                  {players.map((p, i) => (
-                    <div key={i} className={`text-center ${p.eliminated ? 'opacity-40' : ''} ${i === dealer && !p.eliminated ? 'ring-1 ring-amber-400 rounded p-0.5' : ''}`}>
-                      <div className="text-xs text-gray-400 truncate">{playerNames[i]}</div>
-                      {p.eliminated ? (
-                        <div className="text-red-400 font-bold text-xs">OUT</div>
-                      ) : (
-                        <div className="text-emerald-400 font-bold text-sm">${p.chips}</div>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Check for game winner */}
-            {(() => {
-              const activePlayers = players.filter(p => !p.eliminated && p.chips > 0);
-              if (activePlayers.length <= 1 && players.some(p => p.eliminated)) {
-                const gameWinner = activePlayers[0];
-                return (
-                  <div className="p-3 bg-amber-900/60 rounded-xl border-2 border-amber-400 text-center">
-                    <h2 className="font-display text-xl text-amber-400">Game Over!</h2>
-                    <p className="text-lg text-white">{gameWinner?.name || 'No one'} wins with ${gameWinner?.chips || 0}!</p>
-                  </div>
-                );
-              }
-              return null;
-            })()}
-
-            {players.filter(p => !p.eliminated && p.chips > 0).length > 1 && (
-              <button
-                onClick={dealCards}
-                className="w-full px-3 py-2 bg-gradient-to-r from-amber-500 to-yellow-400 text-gray-900 rounded-lg font-bold text-sm shadow-lg hover:from-amber-400 hover:to-yellow-300 transition-all"
-              >
-                Deal Cards {rolloverPot > 0 && `(+$${rolloverPot})`}
-              </button>
-            )}
-
-            <div className="p-2 bg-gray-900/60 rounded-xl border border-gray-800">
-              <h3 className="font-display text-sm text-amber-400 mb-1">How to Win</h3>
-              <ul className="text-xs text-gray-400 space-y-0.5 font-body">
-                <li><span className="text-yellow-400">Pair with board</span> = Best</li>
-                <li><span className="text-blue-400">Pair with player</span> = 2nd</li>
-                <li><span className="text-gray-300">Highest card</span> = 3rd</li>
-                <li><span className="text-purple-400">Board highest</span> = Rollover</li>
-              </ul>
-            </div>
-
-            <button
-              onClick={() => {
-                setGameState('menu');
-                setSeatedPlayers([null, null, null, null]);
-                setLocalPlayerSeat(null);
-                setLocalPlayerName('');
-                setPlayers([
-                  { name: 'Player 1', chips: 50, card: null, revealed: false, folded: false, eliminated: false, peekedCards: [], currentBet: 0, totalRoundBet: 0, allIn: false },
-                  { name: 'Player 2', chips: 50, card: null, revealed: false, folded: false, eliminated: false, peekedCards: [], currentBet: 0, totalRoundBet: 0, allIn: false },
-                  { name: 'Player 3', chips: 50, card: null, revealed: false, folded: false, eliminated: false, peekedCards: [], currentBet: 0, totalRoundBet: 0, allIn: false },
-                  { name: 'Player 4', chips: 50, card: null, revealed: false, folded: false, eliminated: false, peekedCards: [], currentBet: 0, totalRoundBet: 0, allIn: false },
-                ]);
-                setPot(0);
-                setRolloverPot(0);
-              }}
-              className="text-gray-500 hover:text-gray-300 text-sm"
-            >
-              ← Back to Menu
-            </button>
-          </div>
-        )}
 
         {gameState === 'playing' && (
           <div className="flex-1 flex flex-col overflow-hidden">
