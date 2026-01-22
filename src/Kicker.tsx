@@ -275,6 +275,7 @@ export default function Kicker() {
   const [showResetScreen, setShowResetScreen] = useState(false); // "Money has been reset" screen
   const [playerNames, setPlayerNames] = useState(['Player 1', 'Player 2', 'Player 3', 'Player 4']);
   const [isPlayerAI, setIsPlayerAI] = useState([false, false, false, false]);
+  const [setupNames, setSetupNames] = useState(['', '', '', '']); // Pass & Play setup names
   const [autoAI, _setAutoAI] = useState(true);
   const [aiSpeed, _setAiSpeed] = useState(1); // 0.5 = fast, 1 = normal, 2 = slow
   const [aiPendingAction, setAiPendingAction] = useState<{ action: Action; amount?: number } | null>(null);
@@ -493,11 +494,11 @@ export default function Kicker() {
                            (nextPlayer === checkPlayer && sCurrentBet === 0 && sCurrentPlayer !== -1);
 
       if (roundComplete || (playersWhoCanAct.length === 1 && allMatched)) {
-        // Reveal next card
+        // Reveal next card - include eliminated players, their cards still count
         let revealerIndex = -1;
         for (let i = 0; i < simRevealOrder.length; i++) {
           const idx = simRevealOrder[i];
-          if (!sPlayers[idx].revealed && !sPlayers[idx].eliminated) {
+          if (!sPlayers[idx].revealed) {
             revealerIndex = idx;
             break;
           }
@@ -662,20 +663,24 @@ export default function Kicker() {
 
   const determineWinner = (playersToCheck?: Player[]): Winner => {
     const playerList = playersToCheck || players;
+    // Players who can WIN the pot (not folded, not eliminated)
     const activePlayers = playerList.filter(p => !p.folded && !p.eliminated);
+    // ALL players with cards (including eliminated) - their cards still count in the hand
+    const playersWithCards = playerList.filter(p => p.card && !p.folded);
     const boardValue = communalCard!.value;
     const boardRank = communalCard!.rank;
     const boardSuit = communalCard!.suit;
 
-    // Collect all cards with suits for hand evaluation
+    // Collect all cards with suits for hand evaluation - include eliminated players' cards
     const allCards = [
-      { value: boardValue, rank: boardRank, suit: boardSuit, isBoard: true, player: null as Player | null },
-      ...activePlayers.map(p => ({
+      { value: boardValue, rank: boardRank, suit: boardSuit, isBoard: true, player: null as Player | null, eliminated: false },
+      ...playersWithCards.map(p => ({
         value: p.card!.value,
         rank: p.card!.rank,
         suit: p.card!.suit,
         isBoard: false,
-        player: p
+        player: p,
+        eliminated: p.eliminated
       }))
     ];
 
@@ -766,33 +771,36 @@ export default function Kicker() {
     // Helper to determine winner - the player who MADE the hand wins
     // If multiple players made the hand, they SPLIT (shared kicker)
     // If no kicker exists (all cards used), then ROLLOVER
+    // NOTE: Eliminated players' cards count for making the hand but they can't WIN
     const resolveByHandMaker = (handDescription: string, usedValues: Set<number>, handMakers: Player[]): Winner => {
       const kickerDesc = getKickerDescription(usedValues);
       const hasKicker = kickerDesc !== '';
-      console.log('resolveByHandMaker:', handDescription, 'handMakers:', handMakers.map(p => p.name), 'hasKicker:', hasKicker);
+      // Filter out eliminated players - they can't win
+      const eligibleWinners = handMakers.filter(p => !p.eliminated);
+      console.log('resolveByHandMaker:', handDescription, 'handMakers:', handMakers.map(p => p.name), 'eligibleWinners:', eligibleWinners.map(p => p.name), 'hasKicker:', hasKicker);
 
-      if (handMakers.length === 1) {
-        // One player made the hand - they win
-        console.log('Winner:', handMakers[0].name);
+      if (eligibleWinners.length === 1) {
+        // One eligible player made the hand - they win
+        console.log('Winner:', eligibleWinners[0].name);
         return {
-          name: handMakers[0].name,
+          name: eligibleWinners[0].name,
           isSplit: false,
           reason: `${handDescription}${kickerDesc}`,
           rollover: false
         };
-      } else if (handMakers.length > 1) {
-        // Multiple players made the hand - they SPLIT the pot
-        console.log('Split between:', handMakers.map(p => p.name));
+      } else if (eligibleWinners.length > 1) {
+        // Multiple eligible players made the hand - they SPLIT the pot
+        console.log('Split between:', eligibleWinners.map(p => p.name));
         return {
-          name: handMakers.map(p => p.name).join(' & '),
+          name: eligibleWinners.map(p => p.name).join(' & '),
           isSplit: true,
-          players: handMakers,
+          players: eligibleWinners,
           reason: `${handDescription}${kickerDesc}`,
           rollover: false
         };
       }
-      // No players made the hand - rollover
-      console.log('No handMakers - Board rollover');
+      // No eligible players made the hand (all were eliminated or board only) - rollover
+      console.log('No eligible handMakers - Board rollover');
       return { name: 'Board', isSplit: false, reason: handDescription, rollover: true };
     };
 
@@ -812,13 +820,14 @@ export default function Kicker() {
       if (highCard?.isBoard) {
         return { name: 'Board', isSplit: false, reason: `${handDescription} - Board high`, rollover: true };
       }
-      if (highCard?.player) {
+      // Skip eliminated players
+      if (highCard?.player && !highCard.eliminated) {
         return { name: highCard.player.name, isSplit: false, reason: handDescription, rollover: false };
       }
-      // Find player with highest card in the straight
+      // Find eligible player with highest card in the straight
       const sortedByValue = [...allCards].sort((a, b) => b.value - a.value);
       for (const card of sortedByValue) {
-        if (!card.isBoard && card.player) {
+        if (!card.isBoard && card.player && !card.eliminated) {
           return { name: card.player.name, isSplit: false, reason: handDescription, rollover: false };
         }
       }
@@ -848,45 +857,40 @@ export default function Kicker() {
     // 4. Flush
     if (isFlush) {
       const handDescription = `Flush (${flushSuit})`;
-      // Highest card in flush determines winner
+      // Highest card in flush determines winner - skip eliminated players
       const sortedByValue = [...allCards].sort((a, b) => b.value - a.value);
-      const highCard = sortedByValue[0];
 
-      if (highCard.isBoard) {
-        // Check for tie - multiple players with same high card
-        const secondHighest = sortedByValue[1];
-        if (!secondHighest.isBoard && secondHighest.player) {
-          return { name: secondHighest.player.name, isSplit: false, reason: `${handDescription}, ${secondHighest.rank} kicker`, rollover: false };
+      // Find highest eligible card
+      for (const card of sortedByValue) {
+        if (card.isBoard) {
+          // Board is high - find next eligible player card
+          continue;
         }
-        return { name: 'Board', isSplit: false, reason: `${handDescription} - Board high`, rollover: true };
+        if (card.player && !card.eliminated) {
+          return { name: card.player.name, isSplit: false, reason: `${handDescription}, ${card.rank} high`, rollover: false };
+        }
       }
-
-      if (highCard.player) {
-        return { name: highCard.player.name, isSplit: false, reason: `${handDescription}, ${highCard.rank} high`, rollover: false };
-      }
-      return { name: 'Board', isSplit: false, reason: handDescription, rollover: true };
+      // No eligible player - board wins (rollover)
+      return { name: 'Board', isSplit: false, reason: `${handDescription} - Board high`, rollover: true };
     }
 
     // 5. Straight
     if (isStraight) {
       const handDescription = isWheel ? 'Straight (Wheel)' : 'Straight';
-      // Highest card determines winner (or 5 for wheel)
-      const highValue = isWheel ? 5 : Math.max(...sortedValues);
-      const highCard = allCards.find(c => c.value === highValue);
+      // Highest card determines winner (or 5 for wheel) - skip eliminated players
+      const sortedByValue = [...allCards].sort((a, b) => b.value - a.value);
 
-      if (highCard?.isBoard) {
-        // Board is high - next highest player card wins
-        const sortedByValue = [...allCards].filter(c => !c.isBoard).sort((a, b) => b.value - a.value);
-        if (sortedByValue.length > 0 && sortedByValue[0].player) {
-          return { name: sortedByValue[0].player.name, isSplit: false, reason: `${handDescription}, ${sortedByValue[0].rank} kicker`, rollover: false };
+      // Find highest eligible card
+      for (const card of sortedByValue) {
+        if (card.isBoard) {
+          continue;
         }
-        return { name: 'Board', isSplit: false, reason: `${handDescription} - Board high`, rollover: true };
+        if (card.player && !card.eliminated) {
+          return { name: card.player.name, isSplit: false, reason: `${handDescription}, ${card.rank} high`, rollover: false };
+        }
       }
-
-      if (highCard?.player) {
-        return { name: highCard.player.name, isSplit: false, reason: `${handDescription}, ${highCard.rank} high`, rollover: false };
-      }
-      return { name: 'Board', isSplit: false, reason: handDescription, rollover: true };
+      // No eligible player - board wins (rollover)
+      return { name: 'Board', isSplit: false, reason: `${handDescription} - Board high`, rollover: true };
     }
 
     // 6. Three of a kind
@@ -949,32 +953,40 @@ export default function Kicker() {
       }
     }
 
-    // 9. High card
+    // 9. High card - find highest card held by an eligible (non-eliminated) player
     console.log('Fell through to HIGH CARD - no pairs/trips detected!');
     const sortedCards = [...allCards].sort((a, b) => b.value - a.value);
-    const highestCard = sortedCards[0];
 
-    if (highestCard.isBoard) {
-      console.log('Board has high card - rollover');
-      return { name: 'Board', isSplit: false, reason: `${boardRank} high - Board wins`, rollover: true };
+    // Find highest eligible card (skip board and eliminated players)
+    for (const card of sortedCards) {
+      if (card.isBoard) {
+        // If board is highest, it's a rollover
+        console.log('Board has high card - rollover');
+        return { name: 'Board', isSplit: false, reason: `${boardRank} high - Board wins`, rollover: true };
+      }
+      if (card.eliminated) {
+        // Skip eliminated players' cards
+        continue;
+      }
+      // Found highest eligible player card
+      const highCardPlayers = activePlayers.filter(p => p.card!.value === card.value);
+      if (highCardPlayers.length === 1) {
+        console.log('High card winner:', highCardPlayers[0].name);
+        return { name: highCardPlayers[0].name, isSplit: false, reason: `${card.rank} high`, rollover: false };
+      } else if (highCardPlayers.length > 1) {
+        // Multiple players tied for high card - they split
+        console.log('High card split:', highCardPlayers.map(p => p.name));
+        return {
+          name: highCardPlayers.map(p => p.name).join(' & '),
+          isSplit: true,
+          players: highCardPlayers,
+          reason: `${card.rank} high`,
+          rollover: false
+        };
+      }
     }
-
-    // Player has high card
-    const highCardPlayers = activePlayers.filter(p => p.card!.value === highestCard.value);
-    if (highCardPlayers.length === 1) {
-      console.log('High card winner:', highCardPlayers[0].name);
-      return { name: highCardPlayers[0].name, isSplit: false, reason: `${highestCard.rank} high`, rollover: false };
-    } else {
-      // Multiple players tied for high card - they split
-      console.log('High card split:', highCardPlayers.map(p => p.name));
-      return {
-        name: highCardPlayers.map(p => p.name).join(' & '),
-        isSplit: true,
-        players: highCardPlayers,
-        reason: `${highestCard.rank} high`,
-        rollover: false
-      };
-    }
+    // Fallback - board wins (all player cards were eliminated)
+    return { name: 'Board', isSplit: false, reason: `${boardRank} high - Board wins`, rollover: true };
   };
 
   const endRound = (finalPot?: number, finalPlayers?: Player[]) => {
@@ -1130,6 +1142,9 @@ export default function Kicker() {
   };
 
   const advanceToNextPlayer = (updatedPlayers?: Player[], updatedPot?: number, newLastRaiser?: number, newCurrentBet?: number) => {
+    // Don't advance if game/round has ended
+    if (winner || showBrokeScreen) return;
+
     const playersToUse = updatedPlayers || players;
     const potToUse = updatedPot !== undefined ? updatedPot : pot;
     const activePlayers = playersToUse.filter(p => !p.folded && !p.eliminated);
@@ -1176,7 +1191,8 @@ export default function Kicker() {
       let revealerIndex = -1;
       for (let i = 0; i < revealOrder.length; i++) {
         const idx = revealOrder[i];
-        if (!playersToUse[idx].revealed && !playersToUse[idx].eliminated) {
+        // Include eliminated players in reveal - their cards still count
+        if (!playersToUse[idx].revealed) {
           revealerIndex = idx;
           break;
         }
@@ -1194,8 +1210,8 @@ export default function Kicker() {
         i === revealerIndex ? { ...p, revealed: true } : p
       );
       const revealer = revealedPlayers[revealerIndex];
-      const foldedNote = revealer.folded ? ' (folded)' : '';
-      const revealMsg = `${revealer.name} reveals: ${revealer.card!.rank}${revealer.card!.suit}${foldedNote}`;
+      const statusNote = revealer.eliminated ? ' (out)' : revealer.folded ? ' (folded)' : '';
+      const revealMsg = `${revealer.name} reveals: ${revealer.card!.rank}${revealer.card!.suit}${statusNote}`;
       setMessage(revealMsg);
       // Record reveal (not during replay)
       if (!isReplaying) {
@@ -1228,8 +1244,8 @@ export default function Kicker() {
       let revealerIndex = -1;
       for (let i = 0; i < revealOrder.length; i++) {
         const idx = revealOrder[i];
-        // Reveal ALL cards (including folded players) - they're part of the hand
-        if (!playersToUse[idx].revealed && !playersToUse[idx].eliminated) {
+        // Reveal ALL cards (including folded and eliminated players) - their cards count
+        if (!playersToUse[idx].revealed) {
           revealerIndex = idx;
           break;
         }
@@ -1245,8 +1261,8 @@ export default function Kicker() {
         i === revealerIndex ? { ...p, revealed: true } : p
       );
       const revealer = revealedPlayers[revealerIndex];
-      const foldedNote = revealer.folded ? ' (folded)' : '';
-      const revealMsg = `${revealer.name} reveals: ${revealer.card!.rank}${revealer.card!.suit}${foldedNote}`;
+      const statusNote = revealer.eliminated ? ' (out)' : revealer.folded ? ' (folded)' : '';
+      const revealMsg = `${revealer.name} reveals: ${revealer.card!.rank}${revealer.card!.suit}${statusNote}`;
       setMessage(revealMsg);
       if (!isReplaying) {
         setRoundHistory(prev => [...prev, { action: 'check' as Action, playerIndex: revealerIndex, message: revealMsg, playersAfter: revealedPlayers.map(p => ({...p})), potAfter: potToUse, revealedCard: { playerIndex: revealerIndex } }]);
@@ -1259,7 +1275,8 @@ export default function Kicker() {
       let revealerIndex = -1;
       for (let i = 0; i < revealOrder.length; i++) {
         const idx = revealOrder[i];
-        if (!playersToUse[idx].revealed && !playersToUse[idx].eliminated) {
+        // Include eliminated players in reveal
+        if (!playersToUse[idx].revealed) {
           revealerIndex = idx;
           break;
         }
@@ -1274,8 +1291,8 @@ export default function Kicker() {
         i === revealerIndex ? { ...p, revealed: true } : p
       );
       const revealer = revealedPlayers[revealerIndex];
-      const foldedNote = revealer.folded ? ' (folded)' : '';
-      const revealMsg2 = `${revealer.name} reveals: ${revealer.card!.rank}${revealer.card!.suit}${foldedNote}`;
+      const statusNote2 = revealer.eliminated ? ' (out)' : revealer.folded ? ' (folded)' : '';
+      const revealMsg2 = `${revealer.name} reveals: ${revealer.card!.rank}${revealer.card!.suit}${statusNote2}`;
       setMessage(revealMsg2);
       if (!isReplaying) {
         setRoundHistory(prev => [...prev, { action: 'check' as Action, playerIndex: revealerIndex, message: revealMsg2, playersAfter: revealedPlayers.map(p => ({...p})), potAfter: potToUse, revealedCard: { playerIndex: revealerIndex } }]);
@@ -1294,6 +1311,9 @@ export default function Kicker() {
   };
 
   const handleAction = (action: Action, amount = 0) => {
+    // Don't allow actions after the game/round has ended
+    if (winner || showBrokeScreen) return;
+
     // Stop turn timer when action is taken
     setTurnTimerActive(false);
 
@@ -1451,17 +1471,19 @@ export default function Kicker() {
 
     const newPlayers = players.map((p, i) => {
       const canPlay = p.chips >= 1 && !p.eliminated && p.chips > 0;
+      const isEliminated = p.eliminated || p.chips <= 0;
       return {
         ...p,
-        card: canPlay ? newDeck.pop()! : null,
+        // Deal cards to ALL players including eliminated - their cards still count in the hand
+        card: newDeck.pop()!,
         revealed: false,
         folded: !canPlay,
-        eliminated: p.eliminated || p.chips <= 0,
+        eliminated: isEliminated,
         peekedCards: [] as CardType[],
         currentBet: 0,
         totalRoundBet: canPlay ? 1 : 0,
         allIn: false,
-        chips: canPlay ? p.chips - 1 : p.chips, // ante
+        chips: canPlay ? p.chips - 1 : p.chips, // ante (eliminated don't pay)
         aiLevel: isPlayerAI[i] ? (['cautious', 'random', 'aggressive'][Math.floor(Math.random() * 3)] as AISkillLevel) : p.aiLevel,
       };
     });
@@ -1601,31 +1623,32 @@ export default function Kicker() {
 
   // Start turn timer when it's a human's turn
   useEffect(() => {
-    if (gameState === 'playing' && !showPassScreen && currentPlayerData && !currentPlayerData.aiLevel && !winner) {
+    if (gameState === 'playing' && !showPassScreen && currentPlayerData && !currentPlayerData.aiLevel && !winner && !showBrokeScreen) {
       // Don't start timer if player has 0 chips (they'll be auto-handled)
       if (currentPlayerData.chips === 0 && !currentPlayerData.allIn) {
         // Auto-check for broke players
-        setTimeout(() => {
+        const timer = setTimeout(() => {
           if (currentBetAmount === 0 || currentPlayerData.currentBet >= currentBetAmount) {
             setMessage(`${currentPlayerData.name} checks (no chips)`);
             handleAction('check');
           } else {
             // Can't match bet, mark as all-in with 0
-            const newPlayers = [...players];
-            newPlayers[currentPlayer].allIn = true;
+            const newPlayers = players.map((p, i) =>
+              i === currentPlayer ? { ...p, allIn: true } : p
+            );
             setPlayers(newPlayers);
             setMessage(`${currentPlayerData.name} is all-in`);
             advanceToNextPlayer();
           }
         }, 800);
-        return;
+        return () => clearTimeout(timer);
       }
       setTurnTimeRemaining(TURN_TIME_LIMIT);
       setTurnTimerActive(true);
     } else {
       setTurnTimerActive(false);
     }
-  }, [gameState, currentPlayer, showPassScreen, winner]);
+  }, [gameState, currentPlayer, showPassScreen, winner, showBrokeScreen]);
 
   // AI auto-play effect
   useEffect(() => {
@@ -1633,6 +1656,7 @@ export default function Kicker() {
     if (gameState !== 'playing' && gameState !== 'passing') return;
     if (!currentPlayerData?.aiLevel) return;
     if (winner) return;
+    if (showBrokeScreen) return; // Don't run AI after round ended with broke screen
 
     // If player is broke, run AI instantly
     if (playerBroke) {
@@ -1678,7 +1702,7 @@ export default function Kicker() {
         return () => clearTimeout(timer);
       }
     }
-  }, [gameState, currentPlayer, showPassScreen, currentPlayerData?.aiLevel, winner, aiPendingAction, autoAI, aiSpeed, playerBroke]);
+  }, [gameState, currentPlayer, showPassScreen, currentPlayerData?.aiLevel, winner, aiPendingAction, autoAI, aiSpeed, playerBroke, showBrokeScreen]);
 
   // Clear pending action when player changes
   useEffect(() => {
@@ -1707,6 +1731,83 @@ export default function Kicker() {
 
     return () => clearTimeout(timer);
   }, [isReplaying, replayIndex, aiSpeed, roundHistory.length]);
+
+  // Lobby AI - pre-seat some AI players and have them come/go while waiting
+  useEffect(() => {
+    if (gameState !== 'lobby') return;
+    if (localPlayerSeat !== null) return; // Stop when player sits down
+
+    // On entering lobby, randomly seat 0-3 AI players
+    const initialAICount = Math.floor(Math.random() * 4); // 0, 1, 2, or 3
+    if (initialAICount > 0) {
+      const availableSeats = [0, 1, 2, 3].sort(() => Math.random() - 0.5);
+      const seatsToFill = availableSeats.slice(0, initialAICount);
+      const usedNames: string[] = [];
+
+      setSeatedPlayers(() => {
+        const newSeats: (string | null)[] = [null, null, null, null];
+        seatsToFill.forEach(seat => {
+          const availableNames = AI_NAMES.filter(n => !usedNames.includes(n));
+          const name = availableNames[Math.floor(Math.random() * availableNames.length)];
+          usedNames.push(name);
+          newSeats[seat] = name;
+        });
+        return newSeats;
+      });
+    }
+
+    // Set up recursive timeout for AI coming and going with variable delays
+    let timeoutId: ReturnType<typeof setTimeout>;
+
+    const scheduleNextChange = () => {
+      const delay = 3000 + Math.random() * 4000; // 3-7 seconds
+      timeoutId = setTimeout(() => {
+        setSeatedPlayers(prev => {
+          const currentSeated = prev.filter(p => p !== null) as string[];
+          const emptySeats = prev.map((p, i) => p === null ? i : -1).filter(i => i !== -1);
+          const occupiedSeats = prev.map((p, i) => p !== null ? i : -1).filter(i => i !== -1);
+
+          // Random action: 0 = someone leaves, 1 = someone joins, 2 = swap
+          const action = Math.floor(Math.random() * 3);
+
+          if (action === 0 && occupiedSeats.length > 0) {
+            // Someone leaves
+            const leavingSeat = occupiedSeats[Math.floor(Math.random() * occupiedSeats.length)];
+            const newSeats = [...prev];
+            newSeats[leavingSeat] = null;
+            return newSeats;
+          } else if (action === 1 && emptySeats.length > 0) {
+            // Someone joins
+            const joiningSeat = emptySeats[Math.floor(Math.random() * emptySeats.length)];
+            const availableNames = AI_NAMES.filter(n => !currentSeated.includes(n));
+            if (availableNames.length === 0) return prev;
+            const newName = availableNames[Math.floor(Math.random() * availableNames.length)];
+            const newSeats = [...prev];
+            newSeats[joiningSeat] = newName;
+            return newSeats;
+          } else if (action === 2 && occupiedSeats.length > 0) {
+            // Someone leaves and different person joins same seat
+            const swapSeat = occupiedSeats[Math.floor(Math.random() * occupiedSeats.length)];
+            const usedNames = currentSeated.filter(n => n !== prev[swapSeat]);
+            const availableNames = AI_NAMES.filter(n => !usedNames.includes(n));
+            if (availableNames.length === 0) return prev;
+            const newName = availableNames[Math.floor(Math.random() * availableNames.length)];
+            const newSeats = [...prev];
+            newSeats[swapSeat] = newName;
+            return newSeats;
+          }
+
+          return prev;
+        });
+
+        scheduleNextChange(); // Schedule next change
+      }, delay);
+    };
+
+    scheduleNextChange();
+
+    return () => clearTimeout(timeoutId);
+  }, [gameState, localPlayerSeat]);
 
   return (
     <div className="h-dvh bg-gradient-to-br from-gray-900 via-emerald-950 to-gray-900 text-white p-2 font-sans overflow-hidden flex flex-col">
@@ -1774,30 +1875,9 @@ export default function Kicker() {
             <h1 className="font-display text-6xl sm:text-8xl text-transparent bg-clip-text bg-gradient-to-b from-amber-300 via-yellow-400 to-amber-500 drop-shadow-lg mb-4">
               KICKER
             </h1>
-            <p className="text-gray-400 text-lg mb-8">A Game of Cards & Bluffs</p>
+            <p className="text-gray-400 text-lg mb-6">A Game of Cards & Bluffs</p>
 
-            <button
-              onClick={() => setGameState('lobby')}
-              className="px-12 py-4 bg-gradient-to-r from-emerald-600 to-emerald-500 text-white rounded-xl font-bold text-xl shadow-lg hover:from-emerald-500 hover:to-emerald-400 transition-all transform hover:scale-105"
-            >
-              Play
-            </button>
-
-            <div className="mt-12 text-gray-500 text-sm">
-              <p>4 players • 1 card each • Best kicker wins</p>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* LOBBY / TABLE SCREEN */}
-      {gameState === 'lobby' && (
-        <div className="flex-1 flex flex-col items-center justify-center p-4">
-          <h2 className="font-display text-2xl text-amber-400 mb-6">Join the Table</h2>
-
-          {/* Enter your name first */}
-          {localPlayerSeat === null && (
-            <div className="mb-6 w-full max-w-xs">
+            <div className="mb-6 w-full max-w-xs mx-auto">
               <input
                 type="text"
                 value={localPlayerName}
@@ -1807,7 +1887,170 @@ export default function Kicker() {
                 maxLength={12}
               />
             </div>
-          )}
+
+            <div className="flex flex-col gap-4">
+              <button
+                onClick={() => setGameState('lobby')}
+                disabled={!localPlayerName.trim()}
+                className={`px-12 py-4 rounded-xl font-bold text-xl shadow-lg transition-all transform ${
+                  localPlayerName.trim()
+                    ? 'bg-gradient-to-r from-emerald-600 to-emerald-500 text-white hover:from-emerald-500 hover:to-emerald-400 hover:scale-105'
+                    : 'bg-gray-700 text-gray-500 cursor-not-allowed'
+                }`}
+              >
+                Play vs AI
+              </button>
+
+              <button
+                onClick={() => setGameState('setup')}
+                className="px-12 py-4 bg-gradient-to-r from-amber-600 to-amber-500 text-white rounded-xl font-bold text-xl shadow-lg hover:from-amber-500 hover:to-amber-400 transition-all transform hover:scale-105"
+              >
+                Pass & Play
+              </button>
+            </div>
+
+            <div className="mt-8 text-gray-500 text-sm">
+              <p>4 players • 1 card each • Best kicker wins</p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* PASS & PLAY SETUP SCREEN */}
+      {gameState === 'setup' && (
+        <div className="flex-1 flex flex-col items-center justify-center p-4">
+          <h2 className="font-display text-2xl text-amber-400 mb-2">Pass & Play</h2>
+          <p className="text-gray-400 text-sm mb-6">Enter player names (2-4 players)</p>
+
+          <div className="w-full max-w-xs space-y-3 mb-6">
+            {[0, 1, 2, 3].map((i) => (
+              <div key={i} className="flex items-center gap-2">
+                <span className="text-gray-500 text-sm w-6">{i + 1}.</span>
+                <input
+                  type="text"
+                  value={setupNames[i]}
+                  onChange={(e) => {
+                    const newNames = [...setupNames];
+                    newNames[i] = e.target.value;
+                    setSetupNames(newNames);
+                  }}
+                  placeholder={i < 2 ? `Player ${i + 1} (required)` : `Player ${i + 1} (optional)`}
+                  className="flex-1 px-3 py-2 bg-gray-800 border-2 border-gray-600 rounded-lg text-white text-sm focus:border-amber-400 focus:outline-none"
+                  maxLength={12}
+                />
+              </div>
+            ))}
+          </div>
+
+          <div className="flex gap-3">
+            <button
+              onClick={() => {
+                setSetupNames(['', '', '', '']);
+                setGameState('menu');
+              }}
+              className="px-6 py-3 bg-gray-700 hover:bg-gray-600 text-white rounded-lg font-bold transition-colors"
+            >
+              Back
+            </button>
+            <button
+              onClick={() => {
+                // Get valid player names (non-empty)
+                const validNames = setupNames.map((n, i) => n.trim() || (i < 2 ? `Player ${i + 1}` : '')).filter(n => n);
+                if (validNames.length < 2) return;
+
+                // Pad to 4 players with empty slots that will be marked as eliminated
+                const finalNames = [...validNames];
+                while (finalNames.length < 4) finalNames.push(`Seat ${finalNames.length + 1}`);
+
+                setPlayerNames(finalNames);
+                setIsPlayerAI([false, false, false, false]); // All humans
+
+                // Initialize players
+                const newDeck = createDeck();
+                const communal = newDeck.pop()!;
+                const newDealer = Math.floor(Math.random() * validNames.length); // Only among active players
+
+                // Create reveal order starting from dealer+1
+                const order: number[] = [];
+                for (let i = 1; i <= 4; i++) {
+                  order.push((newDealer + i) % 4);
+                }
+
+                const newPlayers = finalNames.map((name, i) => {
+                  const isActive = i < validNames.length;
+                  return {
+                    name,
+                    chips: isActive ? 50 : 0,
+                    card: newDeck.pop()!,
+                    revealed: false,
+                    folded: !isActive,
+                    eliminated: !isActive,
+                    peekedCards: [] as CardType[],
+                    currentBet: 0,
+                    totalRoundBet: isActive ? 1 : 0,
+                    allIn: false,
+                  };
+                });
+
+                // Deduct ante from active players
+                newPlayers.forEach((p, i) => {
+                  if (i < validNames.length) {
+                    p.chips = 49; // 50 - 1 ante
+                  }
+                });
+
+                let firstToAct = (newDealer + 1) % 4;
+                while (newPlayers[firstToAct].eliminated && firstToAct !== newDealer) {
+                  firstToAct = (firstToAct + 1) % 4;
+                }
+
+                setDeck(newDeck);
+                setCommunalCard(communal);
+                setPlayers(newPlayers);
+                setPot(validNames.length); // 1 ante per active player
+                setCurrentPlayer(firstToAct);
+                setCurrentBetAmount(0);
+                setDealer(newDealer);
+                setRevealOrder(order);
+                setRevealPhase(0);
+                setMessage(`${finalNames[newDealer]} is dealer. Communal: ${communal.rank}${communal.suit}`);
+                setShowPassScreen(true);
+                setGameState('passing');
+                setWinner(null);
+                setIsRollover(false);
+                setLastRaiser(-1);
+                setBettingRoundStarter(firstToAct);
+                setPlayerBroke(false);
+                setShowBrokeScreen(false);
+                setLocalPlayerSeat(null); // No single local player in pass & play
+                setSetupNames(['', '', '', '']);
+                setRoundHistory([]);
+                setRoundStartState({
+                  players: newPlayers.map(p => ({ ...p })),
+                  pot: validNames.length,
+                  currentPlayer: firstToAct,
+                  communalCard: communal,
+                  revealOrder: order,
+                });
+              }}
+              disabled={setupNames.filter(n => n.trim()).length < 2}
+              className={`px-8 py-3 rounded-lg font-bold transition-all ${
+                setupNames.filter(n => n.trim()).length >= 2
+                  ? 'bg-gradient-to-r from-emerald-600 to-emerald-500 text-white hover:from-emerald-500 hover:to-emerald-400'
+                  : 'bg-gray-600 text-gray-400 cursor-not-allowed'
+              }`}
+            >
+              Start Game
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* LOBBY / TABLE SCREEN */}
+      {gameState === 'lobby' && (
+        <div className="flex-1 flex flex-col items-center justify-center p-4">
+          <h2 className="font-display text-2xl text-amber-400 mb-2">Join the Table</h2>
+          <p className="text-gray-400 text-sm mb-4">Pick a seat, {localPlayerName}</p>
 
           {/* Table visualization */}
           <div className="relative w-72 h-48 mb-6">
@@ -1880,9 +2123,9 @@ export default function Kicker() {
                           cumulativeDelay += 2000 + Math.random() * Math.max(0, maxGap - 2000);
                         });
                       }}
-                      disabled={localPlayerSeat !== null || !localPlayerName.trim()}
+                      disabled={localPlayerSeat !== null}
                       className={`w-16 h-16 rounded-full border-2 border-dashed flex items-center justify-center text-xs transition-all ${
-                        localPlayerSeat !== null || !localPlayerName.trim()
+                        localPlayerSeat !== null
                           ? 'border-gray-600 text-gray-600 cursor-not-allowed'
                           : 'border-emerald-400 text-emerald-400 hover:bg-emerald-400/20 cursor-pointer'
                       }`}
@@ -2221,24 +2464,36 @@ export default function Kicker() {
                   <div className="space-y-1.5">
                 {canBet && (
                   <div className="grid grid-cols-3 gap-1.5">
-                    <button onClick={() => handleAction('bet', 1)} className="px-2 py-2 bg-green-600 hover:bg-green-500 rounded-lg text-sm font-bold transition-colors">
+                    <button
+                      onClick={() => handleAction('bet', 1)}
+                      disabled={currentPlayerData.chips < 1}
+                      className={`px-2 py-2 rounded-lg text-sm font-bold transition-colors ${currentPlayerData.chips >= 1 ? 'bg-green-600 hover:bg-green-500' : 'bg-gray-600 opacity-50 cursor-not-allowed'}`}
+                    >
                       Bet $1
                     </button>
-                    <button onClick={() => handleAction('bet', 2)} className="px-2 py-2 bg-green-600 hover:bg-green-500 rounded-lg text-sm font-bold transition-colors">
+                    <button
+                      onClick={() => handleAction('bet', 2)}
+                      disabled={currentPlayerData.chips < 2}
+                      className={`px-2 py-2 rounded-lg text-sm font-bold transition-colors ${currentPlayerData.chips >= 2 ? 'bg-green-600 hover:bg-green-500' : 'bg-gray-600 opacity-50 cursor-not-allowed'}`}
+                    >
                       Bet $2
                     </button>
-                    <button onClick={() => handleAction('bet', 3)} className="px-2 py-2 bg-green-600 hover:bg-green-500 rounded-lg text-sm font-bold transition-colors">
+                    <button
+                      onClick={() => handleAction('bet', 3)}
+                      disabled={currentPlayerData.chips < 3}
+                      className={`px-2 py-2 rounded-lg text-sm font-bold transition-colors ${currentPlayerData.chips >= 3 ? 'bg-green-600 hover:bg-green-500' : 'bg-gray-600 opacity-50 cursor-not-allowed'}`}
+                    >
                       Bet $3
                     </button>
                   </div>
                 )}
 
-                {canCall && (
+                {canCall && currentPlayerData.chips > 0 && (
                   <button
                     onClick={() => handleAction('call')}
                     className="w-full px-2 py-2 bg-blue-600 hover:bg-blue-500 rounded-lg text-sm font-bold transition-colors"
                   >
-                    Call ${toCall}
+                    {currentPlayerData.chips >= toCall ? `Call $${toCall}` : `All-in $${currentPlayerData.chips}`}
                   </button>
                 )}
 
@@ -2246,19 +2501,22 @@ export default function Kicker() {
                   <div className="grid grid-cols-3 gap-1.5">
                     <button
                       onClick={() => handleAction('raise', 1)}
-                      className="px-2 py-2 bg-orange-600 hover:bg-orange-500 rounded-lg text-sm font-bold transition-colors"
+                      disabled={currentPlayerData.chips < toCall + 1}
+                      className={`px-2 py-2 rounded-lg text-sm font-bold transition-colors ${currentPlayerData.chips >= toCall + 1 ? 'bg-orange-600 hover:bg-orange-500' : 'bg-gray-600 opacity-50 cursor-not-allowed'}`}
                     >
                       +$1
                     </button>
                     <button
                       onClick={() => handleAction('raise', 2)}
-                      className="px-2 py-2 bg-orange-600 hover:bg-orange-500 rounded-lg text-sm font-bold transition-colors"
+                      disabled={currentPlayerData.chips < toCall + 2}
+                      className={`px-2 py-2 rounded-lg text-sm font-bold transition-colors ${currentPlayerData.chips >= toCall + 2 ? 'bg-orange-600 hover:bg-orange-500' : 'bg-gray-600 opacity-50 cursor-not-allowed'}`}
                     >
                       +$2
                     </button>
                     <button
                       onClick={() => handleAction('raise', 3)}
-                      className="px-2 py-2 bg-orange-600 hover:bg-orange-500 rounded-lg text-sm font-bold transition-colors"
+                      disabled={currentPlayerData.chips < toCall + 3}
+                      className={`px-2 py-2 rounded-lg text-sm font-bold transition-colors ${currentPlayerData.chips >= toCall + 3 ? 'bg-orange-600 hover:bg-orange-500' : 'bg-gray-600 opacity-50 cursor-not-allowed'}`}
                     >
                       +$3
                     </button>
@@ -2268,7 +2526,8 @@ export default function Kicker() {
                 <div className={`grid ${canCheck ? 'grid-cols-3' : 'grid-cols-2'} gap-1.5`}>
                   <button
                     onClick={() => handleAction('peek')}
-                    className="px-2 py-2 bg-purple-600 hover:bg-purple-500 rounded-lg text-sm font-bold transition-colors"
+                    disabled={currentPlayerData.chips < 1}
+                    className={`px-2 py-2 rounded-lg text-sm font-bold transition-colors ${currentPlayerData.chips >= 1 ? 'bg-purple-600 hover:bg-purple-500' : 'bg-gray-600 opacity-50 cursor-not-allowed'}`}
                   >
                     Peek $1
                   </button>
@@ -2323,24 +2582,14 @@ export default function Kicker() {
 
                 {/* All 4 Player Cards */}
                 {players.map((p, idx) => {
-                  if (p.eliminated) {
-                    return (
-                      <div key={idx} className="text-center opacity-30">
-                        <div className="text-xs text-gray-500 truncate max-w-[70px]">{p.name}</div>
-                        <div className="w-11 h-16 rounded-lg bg-gray-800 flex items-center justify-center">
-                          <span className="text-red-400 text-xs font-bold">OUT</span>
-                        </div>
-                      </div>
-                    );
-                  }
-                  const isCurrentTurn = idx === currentPlayer;
+                  const isCurrentTurn = idx === currentPlayer && !p.eliminated;
                   const pairsBoard = p.card?.value === communalCard?.value;
 
                   return (
-                    <div key={idx} className={`text-center ${p.folded ? 'opacity-40' : ''}`}>
-                      <div className={`text-xs truncate max-w-[70px] ${isCurrentTurn ? 'text-amber-400 font-bold' : 'text-gray-400'}`}>
+                    <div key={idx} className={`text-center ${p.folded || p.eliminated ? 'opacity-50' : ''}`}>
+                      <div className={`text-xs truncate max-w-[70px] ${isCurrentTurn ? 'text-amber-400 font-bold' : p.eliminated ? 'text-gray-500' : 'text-gray-400'}`}>
                         {p.name}
-                        {idx === dealer && ' D'}
+                        {idx === dealer && !p.eliminated && ' D'}
                       </div>
                       <div className={`inline-block ${p.revealed ? 'ring-2 ring-cyan-400 rounded-lg' : ''}`}>
                         <Card
@@ -2352,7 +2601,9 @@ export default function Kicker() {
                       </div>
                       {/* Status under card */}
                       <div className="text-xs mt-0.5">
-                        {p.folded ? (
+                        {p.eliminated ? (
+                          <span className="text-red-400">OUT</span>
+                        ) : p.folded ? (
                           <span className="text-red-400">Fold</span>
                         ) : p.revealed && pairsBoard ? (
                           <span className="text-yellow-400">PAIRS!</span>
