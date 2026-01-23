@@ -295,7 +295,7 @@ export default function Kicker() {
   const [winner, setWinner] = useState<Winner | null>(null);
   const [isRollover, setIsRollover] = useState(false);
   const [showLowFundsPopup, setShowLowFundsPopup] = useState(false); // Force replenish or leave
-  const [isMuted, setIsMuted] = useState(true); // Start muted (autoplay policies)
+  const [isMuted, setIsMuted] = useState(false); // Start with music playing
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const winnerRef = useRef<Winner | null>(null); // Track winner for closures
   const [playerNames, setPlayerNames] = useState(['Player 1', 'Player 2', 'Player 3', 'Player 4']);
