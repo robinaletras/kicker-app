@@ -1165,11 +1165,13 @@ export default function Kicker() {
           : `${playerCard.rank} high`;
         setWinner({ name: lastPlayer.name, isSplit: false, reason, rollover: false });
         setRolloverPot(0);
+        setIsRollover(false);
       } else {
         // Board is higher - rollover
         setPlayers(newPlayers);
         setWinner({ name: 'Board', isSplit: false, reason: `${boardRank} high - Tie!`, rollover: true });
         setRolloverPot(potToUse + rolloverPot);
+        setIsRollover(true);
       }
       setGameState('winner');
       return;
