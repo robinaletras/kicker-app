@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 
 const SUITS = ['♠', '♥', '♦', '♣'] as const;
 const RANKS = ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A'] as const;
@@ -297,6 +297,8 @@ export default function Kicker() {
   const [winner, setWinner] = useState<Winner | null>(null);
   const [isRollover, setIsRollover] = useState(false);
   const [playerBroke, setPlayerBroke] = useState(false); // Human player ran out of money
+  const winnerRef = useRef<Winner | null>(null); // Track winner for closures
+  const processingRef = useRef(false); // Prevent concurrent actions
   const [playerNames, setPlayerNames] = useState(['Player 1', 'Player 2', 'Player 3', 'Player 4']);
   const [isPlayerAI, setIsPlayerAI] = useState([false, false, false, false]);
   const [setupNames, setSetupNames] = useState(['', '', '', '']); // Pass & Play setup names
@@ -1646,10 +1648,13 @@ export default function Kicker() {
     if (gameState === 'playing' && !showPassScreen && currentPlayerData && !currentPlayerData.aiLevel && !winner) {
       // Don't start timer if player has 0 chips (they'll be auto-handled)
       if (currentPlayerData.chips === 0 && !currentPlayerData.allIn) {
+        if (processingRef.current) return; // Already processing
         // Auto-check for broke players - faster if playerBroke mode
-        const delay = playerBroke ? 100 : 800;
+        const delay = playerBroke ? 150 : 800;
+        processingRef.current = true;
         const timer = setTimeout(() => {
-          if (winner) return; // Guard against acting after round ended
+          processingRef.current = false;
+          if (winnerRef.current) return; // Round ended
           if (currentBetAmount === 0 || currentPlayerData.currentBet >= currentBetAmount) {
             setMessage(`${currentPlayerData.name} checks (no chips)`);
             handleAction('check');
@@ -1663,7 +1668,7 @@ export default function Kicker() {
             advanceToNextPlayer();
           }
         }, delay);
-        return () => clearTimeout(timer);
+        return () => { clearTimeout(timer); processingRef.current = false; };
       }
       setTurnTimeRemaining(TURN_TIME_LIMIT);
       setTurnTimerActive(true);
@@ -1678,12 +1683,15 @@ export default function Kicker() {
     if (gameState !== 'passing' || !showPassScreen) return;
     if (!currentPlayerData || currentPlayerData.aiLevel) return; // AI handled separately
     if (winner) return;
+    if (processingRef.current) return;
 
+    processingRef.current = true;
     const timer = setTimeout(() => {
-      if (winner) return;
+      processingRef.current = false;
+      if (winnerRef.current) return;
       handleReady();
-    }, 100);
-    return () => clearTimeout(timer);
+    }, 150);
+    return () => { clearTimeout(timer); processingRef.current = false; };
   }, [playerBroke, gameState, showPassScreen, currentPlayerData?.aiLevel, winner]);
 
   // AI auto-play effect
@@ -1695,18 +1703,25 @@ export default function Kicker() {
 
     // If player is broke, run AI with minimal delay (fast but not synchronous to avoid loops)
     if (playerBroke) {
+      if (processingRef.current) return; // Already processing
       if (showPassScreen && gameState === 'passing') {
+        processingRef.current = true;
         const timer = setTimeout(() => {
+          processingRef.current = false;
+          if (winnerRef.current) return; // Round ended
           handleReady();
-        }, 100);
-        return () => clearTimeout(timer);
+        }, 150);
+        return () => { clearTimeout(timer); processingRef.current = false; };
       }
       if (gameState === 'playing' && !showPassScreen) {
+        processingRef.current = true;
         const timer = setTimeout(() => {
+          processingRef.current = false;
+          if (winnerRef.current) return; // Round ended
           const decision = makeAIDecision(currentPlayerData, currentPlayer);
           handleAction(decision.action, decision.amount || 0);
-        }, 100);
-        return () => clearTimeout(timer);
+        }, 150);
+        return () => { clearTimeout(timer); processingRef.current = false; };
       }
     }
 
@@ -1747,6 +1762,11 @@ export default function Kicker() {
   useEffect(() => {
     setAiPendingAction(null);
   }, [currentPlayer]);
+
+  // Sync refs with state for use in closures
+  useEffect(() => {
+    winnerRef.current = winner;
+  }, [winner]);
 
   // Detect when human player goes broke mid-hand
   useEffect(() => {
