@@ -295,7 +295,7 @@ export default function Kicker() {
   const [showPassScreen, setShowPassScreen] = useState(false);
   const [winner, setWinner] = useState<Winner | null>(null);
   const [isRollover, setIsRollover] = useState(false);
-  const [playerBroke, setPlayerBroke] = useState(false); // Human player ran out of money
+  const [reloadNotification, setReloadNotification] = useState(false); // Show funds reloaded notification
   const winnerRef = useRef<Winner | null>(null); // Track winner for closures
   const [playerNames, setPlayerNames] = useState(['Player 1', 'Player 2', 'Player 3', 'Player 4']);
   const [isPlayerAI, setIsPlayerAI] = useState([false, false, false, false]);
@@ -1117,17 +1117,6 @@ export default function Kicker() {
     }
 
     setPlayers(newPlayers);
-
-    // Check if human player is broke (0 chips and didn't win)
-    const humanPlayerIndex = localPlayerSeat !== null ? localPlayerSeat : 0;
-    const humanPlayer = newPlayers[humanPlayerIndex];
-    const humanWon = mainWinner.name === humanPlayer.name ||
-      (mainWinner.isSplit && mainWinner.players?.some(p => p.name === humanPlayer.name));
-
-    if (humanPlayer.chips <= 0 && !humanWon) {
-      setPlayerBroke(true);
-    }
-
     setWinner(mainWinner);
     setRolloverPot(totalRollover);
     setIsRollover(totalRollover > 0);
@@ -1631,44 +1620,12 @@ export default function Kicker() {
   // Start turn timer when it's a human's turn
   useEffect(() => {
     if (gameState === 'playing' && !showPassScreen && currentPlayerData && !currentPlayerData.aiLevel && !winner) {
-      // Auto-skip broke players instantly
-      if (currentPlayerData.chips === 0 && !currentPlayerData.allIn) {
-        // Use minimal delay to prevent loops, instant when playerBroke
-        const timer = setTimeout(() => {
-          if (winnerRef.current) return; // Round ended
-          if (currentBetAmount === 0 || currentPlayerData.currentBet >= currentBetAmount) {
-            handleAction('check');
-          } else {
-            // Can't match bet, mark as all-in with 0
-            const newPlayers = players.map((p, i) =>
-              i === currentPlayer ? { ...p, allIn: true } : p
-            );
-            setPlayers(newPlayers);
-            advanceToNextPlayer(newPlayers, pot);
-          }
-        }, playerBroke ? 50 : 500);
-        return () => clearTimeout(timer);
-      }
       setTurnTimeRemaining(TURN_TIME_LIMIT);
       setTurnTimerActive(true);
     } else {
       setTurnTimerActive(false);
     }
-  }, [gameState, currentPlayer, showPassScreen, winner, playerBroke]);
-
-  // Auto-skip pass screen for broke human players
-  useEffect(() => {
-    if (!playerBroke) return;
-    if (gameState !== 'passing' || !showPassScreen) return;
-    if (currentPlayerData?.aiLevel) return; // AI handled separately
-    if (winner) return;
-
-    const timer = setTimeout(() => {
-      if (winnerRef.current) return;
-      handleReady();
-    }, 50);
-    return () => clearTimeout(timer);
-  }, [playerBroke, gameState, showPassScreen, currentPlayerData?.aiLevel, winner]);
+  }, [gameState, currentPlayer, showPassScreen, winner]);
 
   // AI auto-play effect
   useEffect(() => {
@@ -1720,16 +1677,22 @@ export default function Kicker() {
     winnerRef.current = winner;
   }, [winner]);
 
-  // Detect when human player goes broke mid-hand
+  // Auto-reload chips when human player goes broke
   useEffect(() => {
-    if (playerBroke) return; // Already broke
     if (gameState !== 'playing' && gameState !== 'passing') return;
     const humanPlayerIndex = localPlayerSeat !== null ? localPlayerSeat : 0;
     const humanPlayer = players[humanPlayerIndex];
-    if (humanPlayer && humanPlayer.chips <= 0 && !humanPlayer.eliminated) {
-      setPlayerBroke(true);
+    if (humanPlayer && humanPlayer.chips <= 0 && !humanPlayer.eliminated && !humanPlayer.allIn) {
+      // Auto-reload their chips
+      const newPlayers = players.map((p, i) =>
+        i === humanPlayerIndex ? { ...p, chips: 50 } : p
+      );
+      setPlayers(newPlayers);
+      setReloadNotification(true);
+      // Auto-hide notification after 3 seconds
+      setTimeout(() => setReloadNotification(false), 3000);
     }
-  }, [players, gameState, localPlayerSeat, playerBroke]);
+  }, [players, gameState, localPlayerSeat]);
 
   // Auto-advance replay at current AI speed
   useEffect(() => {
@@ -2027,7 +1990,6 @@ export default function Kicker() {
                 setIsRollover(false);
                 setLastRaiser(-1);
                 setBettingRoundStarter(firstToAct);
-                setPlayerBroke(false);
                 setLocalPlayerSeat(null); // No single local player in pass & play
                 setSetupNames(['', '', '', '']);
                 setRoundHistory([]);
@@ -2271,7 +2233,7 @@ export default function Kicker() {
           onNextRound={handleNextRound}
           rollover={isRollover}
           onReplay={roundStartState ? handleReplayLastRound : undefined}
-          playerBroke={playerBroke}
+          playerBroke={false}
           onReloadFunds={() => {
             // Reset player state but keep name, go to lobby
             setSeatedPlayers([null, null, null, null]);
@@ -2285,7 +2247,6 @@ export default function Kicker() {
             setPot(0);
             setRolloverPot(0);
             setWinner(null);
-            setPlayerBroke(false);
             setGameState('lobby');
           }}
           onNewGame={() => {
@@ -2302,7 +2263,6 @@ export default function Kicker() {
             setPot(0);
             setRolloverPot(0);
             setWinner(null);
-            setPlayerBroke(false);
           }}
         />
       )}
@@ -2327,6 +2287,13 @@ export default function Kicker() {
                 >
                   Stop Replay
                 </button>
+              </div>
+            )}
+
+            {/* Funds Reloaded Notification */}
+            {reloadNotification && (
+              <div className="mb-2 px-4 py-3 bg-emerald-900/80 rounded-lg border border-emerald-500 flex-shrink-0 text-center animate-pulse">
+                <div className="text-emerald-300 font-bold">Funds Reloaded! +$50</div>
               </div>
             )}
 
