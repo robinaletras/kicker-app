@@ -2545,29 +2545,24 @@ export default function Kicker() {
                 {currentPlayerData.currentBet > 0 && (
                   <span className="text-gray-400 ml-1 text-xs">(${currentPlayerData.currentBet})</span>
                 )}
-                {/* Turn Timer */}
-                {turnTimerActive && !currentPlayerData.aiLevel && (
-                  <div className="mt-1">
-                    <div className="relative h-2 bg-gray-700 rounded-full overflow-hidden">
+                {/* Turn Timer - always occupies space */}
+                <div className="mt-1">
+                  <div className={`relative h-2 rounded-full overflow-hidden ${turnTimerActive && !currentPlayerData.aiLevel ? 'bg-gray-700' : 'bg-transparent'}`}>
+                    {turnTimerActive && !currentPlayerData.aiLevel && (
                       <div
                         className={`absolute left-0 top-0 h-full transition-all duration-100 ${turnTimeRemaining < 5 ? 'bg-red-500' : 'bg-amber-400'}`}
                         style={{ width: `${(turnTimeRemaining / TURN_TIME_LIMIT) * 100}%` }}
                       />
-                    </div>
-                    <span className={`text-xs ${turnTimeRemaining < 5 ? 'text-red-400' : 'text-gray-400'}`}>
-                      {Math.ceil(turnTimeRemaining)}s
-                    </span>
+                    )}
                   </div>
-                )}
+                  <span className={`text-xs ${turnTimerActive && !currentPlayerData.aiLevel ? (turnTimeRemaining < 5 ? 'text-red-400' : 'text-gray-400') : 'text-transparent'}`}>
+                    {turnTimerActive && !currentPlayerData.aiLevel ? `${Math.ceil(turnTimeRemaining)}s` : '0s'}
+                  </span>
+                </div>
               </div>
 
               {/* Fixed Dashboard Layout - All buttons always visible */}
               <div className="space-y-3">
-                {/* Thinking indicator for AI */}
-                {currentPlayerData.aiLevel && !aiPendingAction && (
-                  <div className="text-gray-400 text-sm text-center animate-pulse">Thinking...</div>
-                )}
-
                 {/* Row 1: Bet buttons */}
                 <div className="grid grid-cols-3 gap-3">
                   {[1, 2, 3].map(amount => {
