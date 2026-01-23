@@ -163,7 +163,13 @@ const WinnerScreen = ({ winner, pot, players, boardCard, onNextRound, rollover, 
       {rollover ? (
         <>
           <h2 className="font-display text-xl text-purple-400 mb-2">The Board was the best Kicker!</h2>
-          <p className="text-xl text-amber-400 mb-4">${pot} rolls over to next round</p>
+          <p className="text-sm text-gray-400 mb-2">{winner.reason}</p>
+          <div className="flex items-center justify-center gap-3 mb-4">
+            <span className="text-xl text-emerald-400">${pot} pot</span>
+            <span className="px-3 py-1 bg-purple-600 text-white font-bold rounded-full text-sm animate-pulse">
+              ROLLOVER
+            </span>
+          </div>
         </>
       ) : (
         <>
