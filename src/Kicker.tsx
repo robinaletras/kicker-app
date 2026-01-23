@@ -300,6 +300,7 @@ export default function Kicker() {
   const [playerNames, setPlayerNames] = useState(['Player 1', 'Player 2', 'Player 3', 'Player 4']);
   const [isPlayerAI, setIsPlayerAI] = useState([false, false, false, false]);
   const [setupNames, setSetupNames] = useState(['', '', '', '']); // Pass & Play setup names
+  const [setupIsAI, setSetupIsAI] = useState([false, false, false, false]); // Track AI players in Pass & Play
   const [autoAI, _setAutoAI] = useState(true);
   const [aiSpeed, _setAiSpeed] = useState(1); // 0.5 = fast, 1 = normal, 2 = slow
   const [aiPendingAction, setAiPendingAction] = useState<{ action: Action; amount?: number } | null>(null);
@@ -1876,14 +1877,40 @@ export default function Kicker() {
                   type="text"
                   value={setupNames[i]}
                   onChange={(e) => {
+                    const value = e.target.value;
                     const newNames = [...setupNames];
-                    newNames[i] = e.target.value;
+                    const newIsAI = [...setupIsAI];
+
+                    // Detect "ai" typed (case insensitive)
+                    if (value.toLowerCase() === 'ai') {
+                      // Pick a random AI name not already used
+                      const usedNames = newNames.filter((n, idx) => idx !== i && n.trim());
+                      const availableNames = AI_NAMES.filter(n => !usedNames.includes(n));
+                      const aiName = availableNames[Math.floor(Math.random() * availableNames.length)] || `Bot ${i + 1}`;
+                      newNames[i] = aiName;
+                      newIsAI[i] = true;
+                    } else {
+                      newNames[i] = value;
+                      // Clear AI status if they edit the name
+                      if (newIsAI[i] && value !== setupNames[i]) {
+                        newIsAI[i] = false;
+                      }
+                    }
+
                     setSetupNames(newNames);
+                    setSetupIsAI(newIsAI);
                   }}
                   placeholder={i < 2 ? `Player ${i + 1} (required)` : `Player ${i + 1} (optional)`}
-                  className="flex-1 px-3 py-2 bg-gray-800 border-2 border-gray-600 rounded-lg text-white text-sm focus:border-amber-400 focus:outline-none"
+                  className={`flex-1 px-3 py-2 bg-gray-800 border-2 rounded-lg text-white text-sm focus:outline-none ${
+                    setupIsAI[i]
+                      ? 'border-cyan-500 focus:border-cyan-400'
+                      : 'border-gray-600 focus:border-amber-400'
+                  }`}
                   maxLength={12}
                 />
+                {setupIsAI[i] && (
+                  <span className="text-cyan-400 text-xs">AI</span>
+                )}
               </div>
             ))}
           </div>
@@ -1892,6 +1919,7 @@ export default function Kicker() {
             <button
               onClick={() => {
                 setSetupNames(['', '', '', '']);
+                setSetupIsAI([false, false, false, false]);
                 setGameState('menu');
               }}
               className="px-6 py-3 bg-gray-700 hover:bg-gray-600 text-white rounded-lg font-bold transition-colors"
@@ -1900,27 +1928,18 @@ export default function Kicker() {
             </button>
             <button
               onClick={() => {
-                // Process names - replace "ai" with random AI names
-                const usedNames: string[] = [];
+                // Process names - use setupIsAI to determine AI players
                 const processedNames: { name: string; isAI: boolean }[] = [];
 
                 setupNames.forEach((n, i) => {
                   const trimmed = n.trim();
                   if (!trimmed && i >= 2) return; // Skip empty optional slots
 
-                  if (trimmed.toLowerCase() === 'ai') {
-                    // Replace with random AI name
-                    const availableNames = AI_NAMES.filter(name => !usedNames.includes(name));
-                    const aiName = availableNames[Math.floor(Math.random() * availableNames.length)] || `Bot ${i + 1}`;
-                    usedNames.push(aiName);
-                    processedNames.push({ name: aiName, isAI: true });
-                  } else if (trimmed) {
-                    usedNames.push(trimmed);
-                    processedNames.push({ name: trimmed, isAI: false });
+                  if (trimmed) {
+                    processedNames.push({ name: trimmed, isAI: setupIsAI[i] });
                   } else {
                     // Required slot with no name
                     const defaultName = `Player ${i + 1}`;
-                    usedNames.push(defaultName);
                     processedNames.push({ name: defaultName, isAI: false });
                   }
                 });
@@ -1937,6 +1956,8 @@ export default function Kicker() {
 
                 setPlayerNames(finalNames);
                 setIsPlayerAI(finalIsAI);
+                setSetupNames(['', '', '', '']);
+                setSetupIsAI([false, false, false, false]);
 
                 // Initialize players
                 const newDeck = createDeck();
