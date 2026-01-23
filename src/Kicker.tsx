@@ -296,6 +296,8 @@ export default function Kicker() {
   const [winner, setWinner] = useState<Winner | null>(null);
   const [isRollover, setIsRollover] = useState(false);
   const [showLowFundsPopup, setShowLowFundsPopup] = useState(false); // Force replenish or leave
+  const [isMuted, setIsMuted] = useState(true); // Start muted (autoplay policies)
+  const audioRef = useRef<HTMLAudioElement | null>(null);
   const winnerRef = useRef<Winner | null>(null); // Track winner for closures
   const [playerNames, setPlayerNames] = useState(['Player 1', 'Player 2', 'Player 3', 'Player 4']);
   const [isPlayerAI, setIsPlayerAI] = useState([false, false, false, false]);
@@ -1699,6 +1701,29 @@ export default function Kicker() {
     }
   }, [players, gameState, localPlayerSeat, showLowFundsPopup, winner]);
 
+  // Background music control
+  useEffect(() => {
+    if (!audioRef.current) {
+      audioRef.current = new Audio('/Slow Shuffle, Easy Money.mp3');
+      audioRef.current.loop = true;
+      audioRef.current.volume = 0.3;
+    }
+
+    if (isMuted) {
+      audioRef.current.pause();
+    } else {
+      audioRef.current.play().catch(() => {
+        // Autoplay blocked - user needs to interact first
+      });
+    }
+
+    return () => {
+      if (audioRef.current) {
+        audioRef.current.pause();
+      }
+    };
+  }, [isMuted]);
+
 
   // Auto-advance replay at current AI speed
   useEffect(() => {
@@ -1796,6 +1821,15 @@ export default function Kicker() {
         .font-display { font-family: 'Playfair Display', serif; }
         .font-body { font-family: 'Source Sans Pro', sans-serif; }
       `}</style>
+
+      {/* Music Toggle Button */}
+      <button
+        onClick={() => setIsMuted(!isMuted)}
+        className="fixed top-2 right-2 z-[200] w-10 h-10 rounded-full bg-gray-800/80 hover:bg-gray-700 border border-gray-600 flex items-center justify-center text-xl transition-colors"
+        title={isMuted ? 'Play Music' : 'Mute Music'}
+      >
+        {isMuted ? '🔇' : '🔊'}
+      </button>
 
       {/* MENU SCREEN */}
       {gameState === 'menu' && (
