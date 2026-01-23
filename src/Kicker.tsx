@@ -2563,21 +2563,21 @@ export default function Kicker() {
 
               {/* Other Player's Turn Display - Show buttons with animation on selection */}
               {currentPlayerData.aiLevel && (
-                <div className="space-y-1.5">
+                <div className="space-y-3">
                   {/* Thinking indicator when no action selected yet */}
                   {!aiPendingAction && (
-                    <div className="text-gray-400 text-xs text-center animate-pulse mb-1">Thinking...</div>
+                    <div className="text-gray-400 text-sm text-center animate-pulse mb-1">Thinking...</div>
                   )}
 
                   {/* Bet buttons (when no current bet) */}
                   {canBet && (
-                    <div className="grid grid-cols-3 gap-1.5">
+                    <div className="grid grid-cols-3 gap-3">
                       {[1, 2, 3].map(amount => {
                         const isSelected = aiPendingAction?.action === 'bet' && aiPendingAction?.amount === amount;
                         return (
                           <div
                             key={amount}
-                            className={`px-2 py-2 rounded-lg text-sm font-bold text-center transition-all duration-300 ${
+                            className={`px-3 py-4 rounded-xl text-base font-bold text-center transition-all duration-300 ${
                               isSelected
                                 ? 'bg-green-400 text-green-900 scale-110 ring-2 ring-green-300 shadow-lg shadow-green-500/50'
                                 : aiPendingAction ? 'bg-green-900/30 text-green-700' : 'bg-green-600/50 text-green-200'
@@ -2593,7 +2593,7 @@ export default function Kicker() {
                   {/* Call button */}
                   {canCall && (
                     <div
-                      className={`w-full px-2 py-2 rounded-lg text-sm font-bold text-center transition-all duration-300 ${
+                      className={`w-full px-3 py-4 rounded-xl text-base font-bold text-center transition-all duration-300 ${
                         aiPendingAction?.action === 'call'
                           ? 'bg-blue-400 text-blue-900 scale-105 ring-2 ring-blue-300 shadow-lg shadow-blue-500/50'
                           : aiPendingAction ? 'bg-blue-900/30 text-blue-700' : 'bg-blue-600/50 text-blue-200'
@@ -2605,13 +2605,13 @@ export default function Kicker() {
 
                   {/* Raise buttons */}
                   {canRaise && (
-                    <div className="grid grid-cols-3 gap-1.5">
+                    <div className="grid grid-cols-3 gap-3">
                       {[1, 2, 3].map(amount => {
                         const isSelected = aiPendingAction?.action === 'raise' && aiPendingAction?.amount === amount;
                         return (
                           <div
                             key={amount}
-                            className={`px-2 py-2 rounded-lg text-sm font-bold text-center transition-all duration-300 ${
+                            className={`px-3 py-4 rounded-xl text-base font-bold text-center transition-all duration-300 ${
                               isSelected
                                 ? 'bg-orange-400 text-orange-900 scale-110 ring-2 ring-orange-300 shadow-lg shadow-orange-500/50'
                                 : aiPendingAction ? 'bg-orange-900/30 text-orange-700' : 'bg-orange-600/50 text-orange-200'
@@ -2625,10 +2625,10 @@ export default function Kicker() {
                   )}
 
                   {/* Bottom row: Check, Fold */}
-                  <div className={`grid ${canCheck ? 'grid-cols-2' : 'grid-cols-1'} gap-1.5`}>
+                  <div className={`grid ${canCheck ? 'grid-cols-2' : 'grid-cols-1'} gap-3`}>
                     {canCheck && (
                       <div
-                        className={`px-2 py-2 rounded-lg text-sm font-bold text-center transition-all duration-300 ${
+                        className={`px-3 py-4 rounded-xl text-base font-bold text-center transition-all duration-300 ${
                           aiPendingAction?.action === 'check'
                             ? 'bg-gray-300 text-gray-800 scale-110 ring-2 ring-gray-200 shadow-lg shadow-gray-400/50'
                             : aiPendingAction ? 'bg-gray-800/30 text-gray-600' : 'bg-gray-600/50 text-gray-300'
@@ -2638,7 +2638,7 @@ export default function Kicker() {
                       </div>
                     )}
                     <div
-                      className={`px-2 py-2 rounded-lg text-sm font-bold text-center transition-all duration-300 ${
+                      className={`px-3 py-4 rounded-xl text-base font-bold text-center transition-all duration-300 ${
                         aiPendingAction?.action === 'fold'
                           ? 'bg-red-400 text-red-900 scale-110 ring-2 ring-red-300 shadow-lg shadow-red-500/50'
                           : aiPendingAction ? 'bg-red-900/30 text-red-700' : 'bg-red-600/50 text-red-200'
