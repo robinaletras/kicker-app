@@ -2561,180 +2561,189 @@ export default function Kicker() {
                 )}
               </div>
 
-              {/* Other Player's Turn Display - Show buttons with animation on selection */}
-              {currentPlayerData.aiLevel && (
-                <div className="space-y-3">
-                  {/* Thinking indicator when no action selected yet */}
-                  {!aiPendingAction && (
-                    <div className="text-gray-400 text-sm text-center animate-pulse mb-1">Thinking...</div>
-                  )}
+              {/* Fixed Dashboard Layout - All buttons always visible */}
+              <div className="space-y-3">
+                {/* Thinking indicator for AI */}
+                {currentPlayerData.aiLevel && !aiPendingAction && (
+                  <div className="text-gray-400 text-sm text-center animate-pulse">Thinking...</div>
+                )}
 
-                  {/* Bet buttons (when no current bet) */}
-                  {canBet && (
-                    <div className="grid grid-cols-3 gap-3">
-                      {[1, 2, 3].map(amount => {
-                        const isSelected = aiPendingAction?.action === 'bet' && aiPendingAction?.amount === amount;
-                        return (
-                          <div
-                            key={amount}
-                            className={`px-3 py-4 rounded-xl text-base font-bold text-center transition-all duration-300 ${
-                              isSelected
-                                ? 'bg-green-400 text-green-900 scale-110 ring-2 ring-green-300 shadow-lg shadow-green-500/50'
-                                : aiPendingAction ? 'bg-green-900/30 text-green-700' : 'bg-green-600/50 text-green-200'
-                            }`}
-                          >
-                            Bet ${amount}
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
+                {/* Row 1: Bet buttons */}
+                <div className="grid grid-cols-3 gap-3">
+                  {[1, 2, 3].map(amount => {
+                    const isAI = !!currentPlayerData.aiLevel;
+                    const isSelected = isAI && aiPendingAction?.action === 'bet' && aiPendingAction?.amount === amount;
+                    const canAfford = currentPlayerData.chips >= amount;
+                    const isActive = canBet && canAfford;
 
-                  {/* Call button */}
-                  {canCall && (
-                    <div
-                      className={`w-full px-3 py-4 rounded-xl text-base font-bold text-center transition-all duration-300 ${
-                        aiPendingAction?.action === 'call'
-                          ? 'bg-blue-400 text-blue-900 scale-105 ring-2 ring-blue-300 shadow-lg shadow-blue-500/50'
-                          : aiPendingAction ? 'bg-blue-900/30 text-blue-700' : 'bg-blue-600/50 text-blue-200'
+                    if (isAI) {
+                      return (
+                        <div
+                          key={amount}
+                          className={`px-3 py-4 rounded-xl text-base font-bold text-center transition-all duration-300 ${
+                            isSelected
+                              ? 'bg-green-400 text-green-900 scale-105 ring-2 ring-green-300 shadow-lg'
+                              : isActive
+                                ? 'bg-green-600/50 text-green-200'
+                                : 'bg-gray-800/50 text-gray-600'
+                          }`}
+                        >
+                          Bet ${amount}
+                        </div>
+                      );
+                    }
+                    return (
+                      <button
+                        key={amount}
+                        onClick={() => handleAction('bet', amount)}
+                        disabled={!isActive}
+                        className={`px-3 py-4 rounded-xl text-base font-bold transition-colors ${
+                          isActive ? 'bg-green-600 hover:bg-green-500' : 'bg-gray-800/50 text-gray-600 cursor-not-allowed'
+                        }`}
+                      >
+                        Bet ${amount}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {/* Row 2: Call button */}
+                {(() => {
+                  const isAI = !!currentPlayerData.aiLevel;
+                  const isSelected = isAI && aiPendingAction?.action === 'call';
+                  const isActive = canCall && currentPlayerData.chips > 0;
+                  const callText = isActive
+                    ? (currentPlayerData.chips >= toCall ? `Call $${toCall}` : `All-in $${currentPlayerData.chips}`)
+                    : 'Call';
+
+                  if (isAI) {
+                    return (
+                      <div
+                        className={`w-full px-3 py-4 rounded-xl text-base font-bold text-center transition-all duration-300 ${
+                          isSelected
+                            ? 'bg-blue-400 text-blue-900 scale-105 ring-2 ring-blue-300 shadow-lg'
+                            : isActive
+                              ? 'bg-blue-600/50 text-blue-200'
+                              : 'bg-gray-800/50 text-gray-600'
+                        }`}
+                      >
+                        {callText}
+                      </div>
+                    );
+                  }
+                  return (
+                    <button
+                      onClick={() => handleAction('call')}
+                      disabled={!isActive}
+                      className={`w-full px-3 py-4 rounded-xl text-base font-bold transition-colors ${
+                        isActive ? 'bg-blue-600 hover:bg-blue-500' : 'bg-gray-800/50 text-gray-600 cursor-not-allowed'
                       }`}
                     >
-                      Call ${toCall}
-                    </div>
-                  )}
+                      {callText}
+                    </button>
+                  );
+                })()}
 
-                  {/* Raise buttons */}
-                  {canRaise && (
-                    <div className="grid grid-cols-3 gap-3">
-                      {[1, 2, 3].map(amount => {
-                        const isSelected = aiPendingAction?.action === 'raise' && aiPendingAction?.amount === amount;
-                        return (
-                          <div
-                            key={amount}
-                            className={`px-3 py-4 rounded-xl text-base font-bold text-center transition-all duration-300 ${
-                              isSelected
-                                ? 'bg-orange-400 text-orange-900 scale-110 ring-2 ring-orange-300 shadow-lg shadow-orange-500/50'
-                                : aiPendingAction ? 'bg-orange-900/30 text-orange-700' : 'bg-orange-600/50 text-orange-200'
-                            }`}
-                          >
-                            +${amount}
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
+                {/* Row 3: Raise buttons */}
+                <div className="grid grid-cols-3 gap-3">
+                  {[1, 2, 3].map(amount => {
+                    const isAI = !!currentPlayerData.aiLevel;
+                    const isSelected = isAI && aiPendingAction?.action === 'raise' && aiPendingAction?.amount === amount;
+                    const canAfford = currentPlayerData.chips >= toCall + amount;
+                    const isActive = canRaise && canAfford;
 
-                  {/* Bottom row: Check, Fold */}
-                  <div className={`grid ${canCheck ? 'grid-cols-2' : 'grid-cols-1'} gap-3`}>
-                    {canCheck && (
-                      <div
-                        className={`px-3 py-4 rounded-xl text-base font-bold text-center transition-all duration-300 ${
-                          aiPendingAction?.action === 'check'
-                            ? 'bg-gray-300 text-gray-800 scale-110 ring-2 ring-gray-200 shadow-lg shadow-gray-400/50'
-                            : aiPendingAction ? 'bg-gray-800/30 text-gray-600' : 'bg-gray-600/50 text-gray-300'
+                    if (isAI) {
+                      return (
+                        <div
+                          key={amount}
+                          className={`px-3 py-4 rounded-xl text-base font-bold text-center transition-all duration-300 ${
+                            isSelected
+                              ? 'bg-orange-400 text-orange-900 scale-105 ring-2 ring-orange-300 shadow-lg'
+                              : isActive
+                                ? 'bg-orange-600/50 text-orange-200'
+                                : 'bg-gray-800/50 text-gray-600'
+                          }`}
+                        >
+                          +${amount}
+                        </div>
+                      );
+                    }
+                    return (
+                      <button
+                        key={amount}
+                        onClick={() => handleAction('raise', amount)}
+                        disabled={!isActive}
+                        className={`px-3 py-4 rounded-xl text-base font-bold transition-colors ${
+                          isActive ? 'bg-orange-600 hover:bg-orange-500' : 'bg-gray-800/50 text-gray-600 cursor-not-allowed'
+                        }`}
+                      >
+                        +${amount}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {/* Row 4: Check and Fold */}
+                <div className="grid grid-cols-2 gap-3">
+                  {(() => {
+                    const isAI = !!currentPlayerData.aiLevel;
+                    const isSelected = isAI && aiPendingAction?.action === 'check';
+
+                    if (isAI) {
+                      return (
+                        <div
+                          className={`px-3 py-4 rounded-xl text-base font-bold text-center transition-all duration-300 ${
+                            isSelected
+                              ? 'bg-gray-300 text-gray-800 scale-105 ring-2 ring-gray-200 shadow-lg'
+                              : canCheck
+                                ? 'bg-gray-600/50 text-gray-300'
+                                : 'bg-gray-800/50 text-gray-600'
+                          }`}
+                        >
+                          Check
+                        </div>
+                      );
+                    }
+                    return (
+                      <button
+                        onClick={() => handleAction('check')}
+                        disabled={!canCheck}
+                        className={`px-3 py-4 rounded-xl text-base font-bold transition-colors ${
+                          canCheck ? 'bg-gray-600 hover:bg-gray-500' : 'bg-gray-800/50 text-gray-600 cursor-not-allowed'
                         }`}
                       >
                         Check
-                      </div>
-                    )}
-                    <div
-                      className={`px-3 py-4 rounded-xl text-base font-bold text-center transition-all duration-300 ${
-                        aiPendingAction?.action === 'fold'
-                          ? 'bg-red-400 text-red-900 scale-110 ring-2 ring-red-300 shadow-lg shadow-red-500/50'
-                          : aiPendingAction ? 'bg-red-900/30 text-red-700' : 'bg-red-600/50 text-red-200'
-                      }`}
-                    >
-                      Fold
-                    </div>
-                  </div>
+                      </button>
+                    );
+                  })()}
+                  {(() => {
+                    const isAI = !!currentPlayerData.aiLevel;
+                    const isSelected = isAI && aiPendingAction?.action === 'fold';
+
+                    if (isAI) {
+                      return (
+                        <div
+                          className={`px-3 py-4 rounded-xl text-base font-bold text-center transition-all duration-300 ${
+                            isSelected
+                              ? 'bg-red-400 text-red-900 scale-105 ring-2 ring-red-300 shadow-lg'
+                              : 'bg-red-600/50 text-red-200'
+                          }`}
+                        >
+                          Fold
+                        </div>
+                      );
+                    }
+                    return (
+                      <button
+                        onClick={() => handleAction('fold')}
+                        className="px-3 py-4 bg-red-600 hover:bg-red-500 rounded-xl text-base font-bold transition-colors"
+                      >
+                        Fold
+                      </button>
+                    );
+                  })()}
                 </div>
-              )}
-
-              {/* Human Player Controls */}
-              {!currentPlayerData.aiLevel && (
-                <>
-                  {/* Actions */}
-                  <div className="space-y-3">
-                {canBet && (
-                  <div className="grid grid-cols-3 gap-3">
-                    <button
-                      onClick={() => handleAction('bet', 1)}
-                      disabled={currentPlayerData.chips < 1}
-                      className={`px-3 py-4 rounded-xl text-base font-bold transition-colors ${currentPlayerData.chips >= 1 ? 'bg-green-600 hover:bg-green-500' : 'bg-gray-600 opacity-50 cursor-not-allowed'}`}
-                    >
-                      Bet $1
-                    </button>
-                    <button
-                      onClick={() => handleAction('bet', 2)}
-                      disabled={currentPlayerData.chips < 2}
-                      className={`px-3 py-4 rounded-xl text-base font-bold transition-colors ${currentPlayerData.chips >= 2 ? 'bg-green-600 hover:bg-green-500' : 'bg-gray-600 opacity-50 cursor-not-allowed'}`}
-                    >
-                      Bet $2
-                    </button>
-                    <button
-                      onClick={() => handleAction('bet', 3)}
-                      disabled={currentPlayerData.chips < 3}
-                      className={`px-3 py-4 rounded-xl text-base font-bold transition-colors ${currentPlayerData.chips >= 3 ? 'bg-green-600 hover:bg-green-500' : 'bg-gray-600 opacity-50 cursor-not-allowed'}`}
-                    >
-                      Bet $3
-                    </button>
-                  </div>
-                )}
-
-                {canCall && currentPlayerData.chips > 0 && (
-                  <button
-                    onClick={() => handleAction('call')}
-                    className="w-full px-3 py-4 bg-blue-600 hover:bg-blue-500 rounded-xl text-base font-bold transition-colors"
-                  >
-                    {currentPlayerData.chips >= toCall ? `Call $${toCall}` : `All-in $${currentPlayerData.chips}`}
-                  </button>
-                )}
-
-                {canRaise && (
-                  <div className="grid grid-cols-3 gap-3">
-                    <button
-                      onClick={() => handleAction('raise', 1)}
-                      disabled={currentPlayerData.chips < toCall + 1}
-                      className={`px-3 py-4 rounded-xl text-base font-bold transition-colors ${currentPlayerData.chips >= toCall + 1 ? 'bg-orange-600 hover:bg-orange-500' : 'bg-gray-600 opacity-50 cursor-not-allowed'}`}
-                    >
-                      +$1
-                    </button>
-                    <button
-                      onClick={() => handleAction('raise', 2)}
-                      disabled={currentPlayerData.chips < toCall + 2}
-                      className={`px-3 py-4 rounded-xl text-base font-bold transition-colors ${currentPlayerData.chips >= toCall + 2 ? 'bg-orange-600 hover:bg-orange-500' : 'bg-gray-600 opacity-50 cursor-not-allowed'}`}
-                    >
-                      +$2
-                    </button>
-                    <button
-                      onClick={() => handleAction('raise', 3)}
-                      disabled={currentPlayerData.chips < toCall + 3}
-                      className={`px-3 py-4 rounded-xl text-base font-bold transition-colors ${currentPlayerData.chips >= toCall + 3 ? 'bg-orange-600 hover:bg-orange-500' : 'bg-gray-600 opacity-50 cursor-not-allowed'}`}
-                    >
-                      +$3
-                    </button>
-                  </div>
-                )}
-
-                <div className={`grid ${canCheck ? 'grid-cols-2' : 'grid-cols-1'} gap-3`}>
-                  {canCheck && (
-                    <button
-                      onClick={() => handleAction('check')}
-                      className="px-3 py-4 bg-gray-600 hover:bg-gray-500 rounded-xl text-base font-bold transition-colors"
-                    >
-                      Check
-                    </button>
-                  )}
-                  <button
-                    onClick={() => handleAction('fold')}
-                    className="px-3 py-4 bg-red-600 hover:bg-red-500 rounded-xl text-base font-bold transition-colors"
-                  >
-                    Fold
-                  </button>
-                  </div>
-                </div>
-              </>
-              )}
+              </div>
             </div>
 
             {/* Your Card (for human players only - hide AI cards) */}
