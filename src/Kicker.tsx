@@ -1061,32 +1061,29 @@ export default function Kicker() {
 
       // Only count the pair if at least one non-folded player is part of it
       if (playersWithPairValue.length > 0) {
-        if (includesBoard) {
-          // Player pairs with board - they win (or split if multiple players pair with board, which would be trips)
-          const handDescription = `Pair of ${pairRank}s (with board)`;
-          const usedValues = new Set([pairValue]);
-          return resolveByHandMaker(handDescription, usedValues, playersWithPairValue);
-        } else if (playersWithPairValue.length >= 1) {
-          // At least one non-folded player has the pair card - they win with it
-          // (The other pair-maker may have folded, but the pair still exists)
-          const handDescription = `Pair of ${pairRank}s`;
-          const usedValues = new Set([pairValue]);
+        const handDescription = includesBoard ? `Pair of ${pairRank}s (with board)` : `Pair of ${pairRank}s`;
 
-          if (playersWithPairValue.length >= 2) {
-            // Multiple non-folded players have the pair - they split
-            console.log('Player pair - splitting between:', playersWithPairValue.map(p => p.name));
-            return {
-              name: playersWithPairValue.map(p => p.name).join(' & '),
-              isSplit: true,
-              players: playersWithPairValue,
-              reason: `${handDescription}${getKickerDescription(usedValues)}`,
-              rollover: false
-            };
-          }
-
-          // One non-folded player has the pair card - they win
-          return resolveByHandMaker(handDescription, usedValues, playersWithPairValue);
+        if (playersWithPairValue.length >= 2) {
+          // Multiple non-folded players share the pair - they SPLIT (no kicker matters, all cards shared)
+          console.log('Player pair - splitting between:', playersWithPairValue.map(p => p.name));
+          return {
+            name: playersWithPairValue.map(p => p.name).join(' & '),
+            isSplit: true,
+            players: playersWithPairValue,
+            reason: handDescription,
+            rollover: false
+          };
         }
+
+        // One non-folded player has the pair card - they win
+        // (The other pair-maker may have folded, but the remaining player still has the pair)
+        console.log('One player wins with pair:', playersWithPairValue[0].name);
+        return {
+          name: playersWithPairValue[0].name,
+          isSplit: false,
+          reason: handDescription,
+          rollover: false
+        };
       }
       // If all pair-makers folded, fall through to high card
       console.log('All pair-makers folded, falling through to high card');
