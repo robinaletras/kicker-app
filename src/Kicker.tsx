@@ -1427,6 +1427,15 @@ export default function Kicker() {
   };
 
   const handleNextRound = () => {
+    // Check for low funds (single player mode only)
+    if (localPlayerSeat !== null) {
+      const humanPlayer = players[localPlayerSeat];
+      if (humanPlayer && humanPlayer.chips <= 20 && !humanPlayer.eliminated) {
+        setShowLowFundsPopup(true);
+        return; // Don't start next round until they replenish
+      }
+    }
+
     // Check for game over (only 1 player with chips left)
     const playersWithChips = players.filter(p => !p.eliminated && p.chips > 0);
     if (playersWithChips.length <= 1) {
@@ -1676,15 +1685,6 @@ export default function Kicker() {
     winnerRef.current = winner;
   }, [winner]);
 
-  // Check for low funds when round ends - show popup if chips <= 20
-  useEffect(() => {
-    if (gameState !== 'winner') return;
-    const humanPlayerIndex = localPlayerSeat !== null ? localPlayerSeat : 0;
-    const humanPlayer = players[humanPlayerIndex];
-    if (humanPlayer && humanPlayer.chips <= 20 && !humanPlayer.eliminated) {
-      setShowLowFundsPopup(true);
-    }
-  }, [gameState, players, localPlayerSeat]);
 
   // Auto-advance replay at current AI speed
   useEffect(() => {
