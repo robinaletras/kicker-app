@@ -297,6 +297,7 @@ export default function Kicker() {
   const [isRollover, setIsRollover] = useState(false);
   const [reloadNotification, setReloadNotification] = useState(false); // Show funds reloaded notification
   const winnerRef = useRef<Winner | null>(null); // Track winner for closures
+  const reloadedThisRoundRef = useRef(false); // Prevent multiple reloads per round
   const [playerNames, setPlayerNames] = useState(['Player 1', 'Player 2', 'Player 3', 'Player 4']);
   const [isPlayerAI, setIsPlayerAI] = useState([false, false, false, false]);
   const [setupNames, setSetupNames] = useState(['', '', '', '']); // Pass & Play setup names
@@ -365,8 +366,8 @@ export default function Kicker() {
     const playerList = playersToCheck || players;
     let next = (fromIndex + 1) % 4;
     let attempts = 0;
-    // Skip folded, eliminated, all-in, AND broke players (they can't act)
-    while ((playerList[next].folded || playerList[next].eliminated || playerList[next].allIn || playerList[next].chips <= 0) && attempts < 4) {
+    // Skip folded, eliminated, and all-in players (they can't act)
+    while ((playerList[next].folded || playerList[next].eliminated || playerList[next].allIn) && attempts < 4) {
       next = (next + 1) % 4;
       attempts++;
     }
@@ -1158,8 +1159,7 @@ export default function Kicker() {
     const playersToUse = updatedPlayers || players;
     const potToUse = updatedPot !== undefined ? updatedPot : pot;
     const activePlayers = playersToUse.filter(p => !p.folded && !p.eliminated);
-    // Players who can act: not folded, not eliminated, not all-in, AND have chips
-    const playersWhoCanAct = playersToUse.filter(p => !p.folded && !p.eliminated && !p.allIn && p.chips > 0);
+    const playersWhoCanAct = playersToUse.filter(p => !p.folded && !p.eliminated && !p.allIn);
     const lastRaiserToUse = newLastRaiser !== undefined ? newLastRaiser : lastRaiser;
     const currentBetToUse = newCurrentBet !== undefined ? newCurrentBet : currentBetAmount;
 
@@ -1677,12 +1677,15 @@ export default function Kicker() {
     winnerRef.current = winner;
   }, [winner]);
 
-  // Auto-reload chips when human player goes broke
+  // Auto-reload chips when human player goes broke (once per round)
   useEffect(() => {
     if (gameState !== 'playing' && gameState !== 'passing') return;
+    if (reloadedThisRoundRef.current) return; // Already reloaded this round
+
     const humanPlayerIndex = localPlayerSeat !== null ? localPlayerSeat : 0;
     const humanPlayer = players[humanPlayerIndex];
     if (humanPlayer && humanPlayer.chips <= 0 && !humanPlayer.eliminated && !humanPlayer.allIn) {
+      reloadedThisRoundRef.current = true;
       // Auto-reload their chips
       const newPlayers = players.map((p, i) =>
         i === humanPlayerIndex ? { ...p, chips: 50 } : p
@@ -1693,6 +1696,13 @@ export default function Kicker() {
       setTimeout(() => setReloadNotification(false), 3000);
     }
   }, [players, gameState, localPlayerSeat]);
+
+  // Reset reload flag when round ends
+  useEffect(() => {
+    if (gameState === 'winner' || gameState === 'menu' || gameState === 'lobby') {
+      reloadedThisRoundRef.current = false;
+    }
+  }, [gameState]);
 
   // Auto-advance replay at current AI speed
   useEffect(() => {
