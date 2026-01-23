@@ -334,7 +334,6 @@ export default function Kicker() {
   const [seatedPlayers, setSeatedPlayers] = useState<(string | null)[]>([null, null, null, null]);
   const [localPlayerSeat, setLocalPlayerSeat] = useState<number | null>(null);
   const [localPlayerName, setLocalPlayerName] = useState('');
-  const [spectatorMode, setSpectatorMode] = useState(false); // Hidden: type "ai" to watch AI play
 
   const AI_NAMES = [
     'Alex', 'Sam', 'Jordan', 'Taylor', 'Casey',
@@ -1460,7 +1459,6 @@ export default function Kicker() {
       setSeatedPlayers([null, null, null, null]);
       setLocalPlayerSeat(null);
       setLocalPlayerName('');
-      setSpectatorMode(false);
       setPlayers([
         { name: 'Player 1', chips: 50, card: null, revealed: false, folded: false, eliminated: false, peekedCards: [], currentBet: 0, totalRoundBet: 0, allIn: false },
         { name: 'Player 2', chips: 50, card: null, revealed: false, folded: false, eliminated: false, peekedCards: [], currentBet: 0, totalRoundBet: 0, allIn: false },
@@ -1924,21 +1922,48 @@ export default function Kicker() {
             </button>
             <button
               onClick={() => {
-                // Get valid player names (non-empty)
-                const validNames = setupNames.map((n, i) => n.trim() || (i < 2 ? `Player ${i + 1}` : '')).filter(n => n);
-                if (validNames.length < 2) return;
+                // Process names - replace "ai" with random AI names
+                const usedNames: string[] = [];
+                const processedNames: { name: string; isAI: boolean }[] = [];
+
+                setupNames.forEach((n, i) => {
+                  const trimmed = n.trim();
+                  if (!trimmed && i >= 2) return; // Skip empty optional slots
+
+                  if (trimmed.toLowerCase() === 'ai') {
+                    // Replace with random AI name
+                    const availableNames = AI_NAMES.filter(name => !usedNames.includes(name));
+                    const aiName = availableNames[Math.floor(Math.random() * availableNames.length)] || `Bot ${i + 1}`;
+                    usedNames.push(aiName);
+                    processedNames.push({ name: aiName, isAI: true });
+                  } else if (trimmed) {
+                    usedNames.push(trimmed);
+                    processedNames.push({ name: trimmed, isAI: false });
+                  } else {
+                    // Required slot with no name
+                    const defaultName = `Player ${i + 1}`;
+                    usedNames.push(defaultName);
+                    processedNames.push({ name: defaultName, isAI: false });
+                  }
+                });
+
+                if (processedNames.length < 2) return;
 
                 // Pad to 4 players with empty slots that will be marked as eliminated
-                const finalNames = [...validNames];
-                while (finalNames.length < 4) finalNames.push(`Seat ${finalNames.length + 1}`);
+                const finalNames = processedNames.map(p => p.name);
+                const finalIsAI = processedNames.map(p => p.isAI);
+                while (finalNames.length < 4) {
+                  finalNames.push(`Seat ${finalNames.length + 1}`);
+                  finalIsAI.push(false);
+                }
 
                 setPlayerNames(finalNames);
-                setIsPlayerAI([false, false, false, false]); // All humans
+                setIsPlayerAI(finalIsAI);
 
                 // Initialize players
                 const newDeck = createDeck();
                 const communal = newDeck.pop()!;
-                const newDealer = Math.floor(Math.random() * validNames.length); // Only among active players
+                const newDealer = Math.floor(Math.random() * processedNames.length); // Only among active players
 
                 // Create reveal order starting from dealer+1
                 const order: number[] = [];
@@ -1947,7 +1972,7 @@ export default function Kicker() {
                 }
 
                 const newPlayers = finalNames.map((name, i) => {
-                  const isActive = i < validNames.length;
+                  const isActive = i < processedNames.length;
                   return {
                     name,
                     chips: isActive ? 50 : 0,
@@ -1959,12 +1984,13 @@ export default function Kicker() {
                     currentBet: 0,
                     totalRoundBet: isActive ? 1 : 0,
                     allIn: false,
+                    aiLevel: (isActive && finalIsAI[i]) ? (['cautious', 'random', 'aggressive'][Math.floor(Math.random() * 3)] as AISkillLevel) : undefined,
                   };
                 });
 
                 // Deduct ante from active players
                 newPlayers.forEach((p, i) => {
-                  if (i < validNames.length) {
+                  if (i < processedNames.length) {
                     p.chips = 49; // 50 - 1 ante
                   }
                 });
@@ -1977,7 +2003,7 @@ export default function Kicker() {
                 setDeck(newDeck);
                 setCommunalCard(communal);
                 setPlayers(newPlayers);
-                setPot(validNames.length); // 1 ante per active player
+                setPot(processedNames.length); // 1 ante per active player
                 setCurrentPlayer(firstToAct);
                 setCurrentBetAmount(0);
                 setDealer(newDealer);
@@ -1996,7 +2022,7 @@ export default function Kicker() {
                 setRoundHistory([]);
                 setRoundStartState({
                   players: newPlayers.map(p => ({ ...p })),
-                  pot: validNames.length,
+                  pot: processedNames.length,
                   currentPlayer: firstToAct,
                   communalCard: communal,
                   revealOrder: order,
@@ -2052,16 +2078,7 @@ export default function Kicker() {
                     <button
                       onClick={() => {
                         if (localPlayerSeat !== null) return; // Already seated
-                        let name = localPlayerName.trim() || 'Player';
-
-                        // Hidden feature: type "ai" to spectate (all AI game)
-                        const isAIMode = name.toLowerCase() === 'ai';
-                        if (isAIMode) {
-                          const currentSeated = seatedPlayers.filter(n => n !== null) as string[];
-                          const availableNames = AI_NAMES.filter(n => !currentSeated.includes(n));
-                          name = availableNames[Math.floor(Math.random() * availableNames.length)] || 'Player';
-                          setSpectatorMode(true);
-                        }
+                        const name = localPlayerName.trim() || 'Player';
 
                         setSeatedPlayers(prev => {
                           const newSeats = [...prev];
@@ -2123,8 +2140,7 @@ export default function Kicker() {
               onClick={() => {
                 // Set up the game with seated players
                 const names = seatedPlayers as string[];
-                // In spectator mode, all players are AI
-                const isAI = spectatorMode ? names.map(() => true) : names.map((_, i) => i !== localPlayerSeat);
+                const isAI = names.map((_, i) => i !== localPlayerSeat);
                 setPlayerNames(names);
                 setIsPlayerAI(isAI);
                 const newDealer = Math.floor(Math.random() * 4);
@@ -2250,7 +2266,6 @@ export default function Kicker() {
             // Reset player state but keep name, go to lobby
             setSeatedPlayers([null, null, null, null]);
             setLocalPlayerSeat(null);
-            setSpectatorMode(false);
             setPlayers([
               { name: 'Player 1', chips: 50, card: null, revealed: false, folded: false, eliminated: false, peekedCards: [], currentBet: 0, totalRoundBet: 0, allIn: false },
               { name: 'Player 2', chips: 50, card: null, revealed: false, folded: false, eliminated: false, peekedCards: [], currentBet: 0, totalRoundBet: 0, allIn: false },
@@ -2268,7 +2283,6 @@ export default function Kicker() {
             setSeatedPlayers([null, null, null, null]);
             setLocalPlayerSeat(null);
             setLocalPlayerName('');
-            setSpectatorMode(false);
             setPlayers([
               { name: 'Player 1', chips: 50, card: null, revealed: false, folded: false, eliminated: false, peekedCards: [], currentBet: 0, totalRoundBet: 0, allIn: false },
               { name: 'Player 2', chips: 50, card: null, revealed: false, folded: false, eliminated: false, peekedCards: [], currentBet: 0, totalRoundBet: 0, allIn: false },
