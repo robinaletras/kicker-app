@@ -278,10 +278,10 @@ export default function Kicker() {
   const [gameState, setGameState] = useState<GameState>('menu');
   const [communalCard, setCommunalCard] = useState<CardType | null>(null);
   const [players, setPlayers] = useState<Player[]>([
-    { name: 'Player 1', chips: 50, card: null, revealed: false, folded: false, eliminated: false, peekedCards: [], currentBet: 0, totalRoundBet: 0, allIn: false },
-    { name: 'Player 2', chips: 50, card: null, revealed: false, folded: false, eliminated: false, peekedCards: [], currentBet: 0, totalRoundBet: 0, allIn: false },
-    { name: 'Player 3', chips: 50, card: null, revealed: false, folded: false, eliminated: false, peekedCards: [], currentBet: 0, totalRoundBet: 0, allIn: false },
-    { name: 'Player 4', chips: 50, card: null, revealed: false, folded: false, eliminated: false, peekedCards: [], currentBet: 0, totalRoundBet: 0, allIn: false },
+    { name: 'Player 1', chips: 100, card: null, revealed: false, folded: false, eliminated: false, peekedCards: [], currentBet: 0, totalRoundBet: 0, allIn: false },
+    { name: 'Player 2', chips: 100, card: null, revealed: false, folded: false, eliminated: false, peekedCards: [], currentBet: 0, totalRoundBet: 0, allIn: false },
+    { name: 'Player 3', chips: 100, card: null, revealed: false, folded: false, eliminated: false, peekedCards: [], currentBet: 0, totalRoundBet: 0, allIn: false },
+    { name: 'Player 4', chips: 100, card: null, revealed: false, folded: false, eliminated: false, peekedCards: [], currentBet: 0, totalRoundBet: 0, allIn: false },
   ]);
   const [pot, setPot] = useState(0);
   const [_sidePots, setSidePots] = useState<SidePot[]>([]); // TODO: Implement full side pot logic
@@ -1525,10 +1525,10 @@ export default function Kicker() {
       setLocalPlayerSeat(null);
       setLocalPlayerName('');
       setPlayers([
-        { name: 'Player 1', chips: 50, card: null, revealed: false, folded: false, eliminated: false, peekedCards: [], currentBet: 0, totalRoundBet: 0, allIn: false },
-        { name: 'Player 2', chips: 50, card: null, revealed: false, folded: false, eliminated: false, peekedCards: [], currentBet: 0, totalRoundBet: 0, allIn: false },
-        { name: 'Player 3', chips: 50, card: null, revealed: false, folded: false, eliminated: false, peekedCards: [], currentBet: 0, totalRoundBet: 0, allIn: false },
-        { name: 'Player 4', chips: 50, card: null, revealed: false, folded: false, eliminated: false, peekedCards: [], currentBet: 0, totalRoundBet: 0, allIn: false },
+        { name: 'Player 1', chips: 100, card: null, revealed: false, folded: false, eliminated: false, peekedCards: [], currentBet: 0, totalRoundBet: 0, allIn: false },
+        { name: 'Player 2', chips: 100, card: null, revealed: false, folded: false, eliminated: false, peekedCards: [], currentBet: 0, totalRoundBet: 0, allIn: false },
+        { name: 'Player 3', chips: 100, card: null, revealed: false, folded: false, eliminated: false, peekedCards: [], currentBet: 0, totalRoundBet: 0, allIn: false },
+        { name: 'Player 4', chips: 100, card: null, revealed: false, folded: false, eliminated: false, peekedCards: [], currentBet: 0, totalRoundBet: 0, allIn: false },
       ]);
       setPot(0);
       setRolloverPot(0);
@@ -2255,7 +2255,7 @@ export default function Kicker() {
 
                 const newPlayers = names.map((name, i) => ({
                   name,
-                  chips: 50 - 1, // minus ante
+                  chips: 100 - 1, // minus ante
                   card: newDeck.pop()!,
                   revealed: false,
                   folded: false,
@@ -2364,10 +2364,10 @@ export default function Kicker() {
             setSeatedPlayers([null, null, null, null]);
             setLocalPlayerSeat(null);
             setPlayers([
-              { name: 'Player 1', chips: 50, card: null, revealed: false, folded: false, eliminated: false, peekedCards: [], currentBet: 0, totalRoundBet: 0, allIn: false },
-              { name: 'Player 2', chips: 50, card: null, revealed: false, folded: false, eliminated: false, peekedCards: [], currentBet: 0, totalRoundBet: 0, allIn: false },
-              { name: 'Player 3', chips: 50, card: null, revealed: false, folded: false, eliminated: false, peekedCards: [], currentBet: 0, totalRoundBet: 0, allIn: false },
-              { name: 'Player 4', chips: 50, card: null, revealed: false, folded: false, eliminated: false, peekedCards: [], currentBet: 0, totalRoundBet: 0, allIn: false },
+              { name: 'Player 1', chips: 100, card: null, revealed: false, folded: false, eliminated: false, peekedCards: [], currentBet: 0, totalRoundBet: 0, allIn: false },
+              { name: 'Player 2', chips: 100, card: null, revealed: false, folded: false, eliminated: false, peekedCards: [], currentBet: 0, totalRoundBet: 0, allIn: false },
+              { name: 'Player 3', chips: 100, card: null, revealed: false, folded: false, eliminated: false, peekedCards: [], currentBet: 0, totalRoundBet: 0, allIn: false },
+              { name: 'Player 4', chips: 100, card: null, revealed: false, folded: false, eliminated: false, peekedCards: [], currentBet: 0, totalRoundBet: 0, allIn: false },
             ]);
             setPot(0);
             setRolloverPot(0);
@@ -2380,10 +2380,10 @@ export default function Kicker() {
             setLocalPlayerSeat(null);
             setLocalPlayerName('');
             setPlayers([
-              { name: 'Player 1', chips: 50, card: null, revealed: false, folded: false, eliminated: false, peekedCards: [], currentBet: 0, totalRoundBet: 0, allIn: false },
-              { name: 'Player 2', chips: 50, card: null, revealed: false, folded: false, eliminated: false, peekedCards: [], currentBet: 0, totalRoundBet: 0, allIn: false },
-              { name: 'Player 3', chips: 50, card: null, revealed: false, folded: false, eliminated: false, peekedCards: [], currentBet: 0, totalRoundBet: 0, allIn: false },
-              { name: 'Player 4', chips: 50, card: null, revealed: false, folded: false, eliminated: false, peekedCards: [], currentBet: 0, totalRoundBet: 0, allIn: false },
+              { name: 'Player 1', chips: 100, card: null, revealed: false, folded: false, eliminated: false, peekedCards: [], currentBet: 0, totalRoundBet: 0, allIn: false },
+              { name: 'Player 2', chips: 100, card: null, revealed: false, folded: false, eliminated: false, peekedCards: [], currentBet: 0, totalRoundBet: 0, allIn: false },
+              { name: 'Player 3', chips: 100, card: null, revealed: false, folded: false, eliminated: false, peekedCards: [], currentBet: 0, totalRoundBet: 0, allIn: false },
+              { name: 'Player 4', chips: 100, card: null, revealed: false, folded: false, eliminated: false, peekedCards: [], currentBet: 0, totalRoundBet: 0, allIn: false },
             ]);
             setPot(0);
             setRolloverPot(0);
