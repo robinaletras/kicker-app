@@ -1630,13 +1630,12 @@ export default function Kicker() {
   // Start turn timer when it's a human's turn
   useEffect(() => {
     if (gameState === 'playing' && !showPassScreen && currentPlayerData && !currentPlayerData.aiLevel && !winner) {
-      // Don't start timer if player has 0 chips (they'll be auto-handled)
+      // Auto-skip broke players instantly
       if (currentPlayerData.chips === 0 && !currentPlayerData.allIn) {
-        // Auto-check for broke players
+        // Use minimal delay to prevent loops, instant when playerBroke
         const timer = setTimeout(() => {
           if (winnerRef.current) return; // Round ended
           if (currentBetAmount === 0 || currentPlayerData.currentBet >= currentBetAmount) {
-            setMessage(`${currentPlayerData.name} checks (no chips)`);
             handleAction('check');
           } else {
             // Can't match bet, mark as all-in with 0
@@ -1644,10 +1643,9 @@ export default function Kicker() {
               i === currentPlayer ? { ...p, allIn: true } : p
             );
             setPlayers(newPlayers);
-            setMessage(`${currentPlayerData.name} is all-in`);
             advanceToNextPlayer();
           }
-        }, 800);
+        }, playerBroke ? 50 : 500);
         return () => clearTimeout(timer);
       }
       setTurnTimeRemaining(TURN_TIME_LIMIT);
@@ -1655,7 +1653,21 @@ export default function Kicker() {
     } else {
       setTurnTimerActive(false);
     }
-  }, [gameState, currentPlayer, showPassScreen, winner]);
+  }, [gameState, currentPlayer, showPassScreen, winner, playerBroke]);
+
+  // Auto-skip pass screen for broke human players
+  useEffect(() => {
+    if (!playerBroke) return;
+    if (gameState !== 'passing' || !showPassScreen) return;
+    if (currentPlayerData?.aiLevel) return; // AI handled separately
+    if (winner) return;
+
+    const timer = setTimeout(() => {
+      if (winnerRef.current) return;
+      handleReady();
+    }, 50);
+    return () => clearTimeout(timer);
+  }, [playerBroke, gameState, showPassScreen, currentPlayerData?.aiLevel, winner]);
 
   // AI auto-play effect
   useEffect(() => {
