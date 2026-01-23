@@ -1148,8 +1148,14 @@ export default function Kicker() {
     setBettingRoundStarter(starter);
     setCurrentPlayer(starter);
     setRevealPhase(nextRevealPhase);
-    setShowPassScreen(true);
-    setGameState('passing');
+    // Skip pass screen in single player mode
+    if (localPlayerSeat !== null) {
+      setShowPassScreen(false);
+      setGameState('playing');
+    } else {
+      setShowPassScreen(true);
+      setGameState('passing');
+    }
   };
 
   const advanceToNextPlayer = (updatedPlayers?: Player[], updatedPot?: number, newLastRaiser?: number, newCurrentBet?: number) => {
@@ -1316,8 +1322,14 @@ export default function Kicker() {
       const preservedPlayers = playersToUse.map(p => ({ ...p, revealed: p.revealed }));
       setPlayers(preservedPlayers);
       setPot(potToUse);
-      setShowPassScreen(true);
-      setGameState('passing');
+      // Skip pass screen in single player mode
+      if (localPlayerSeat !== null) {
+        setShowPassScreen(false);
+        setGameState('playing');
+      } else {
+        setShowPassScreen(true);
+        setGameState('passing');
+      }
     }
   };
 
@@ -1515,8 +1527,14 @@ export default function Kicker() {
     setRevealPhase(0);
     setMessage(`${playerNames[nextDealer]} is dealer. Communal: ${communal.rank}${communal.suit}${rolloverPot > 0 ? ` (+$${rolloverPot} rollover!)` : ''}`);
     setRolloverPot(0);
-    setShowPassScreen(true);
-    setGameState('passing');
+    // Skip pass screen in single player mode
+    if (localPlayerSeat !== null) {
+      setShowPassScreen(false);
+      setGameState('playing');
+    } else {
+      setShowPassScreen(true);
+      setGameState('passing');
+    }
     setWinner(null);
     setIsRollover(false);
     setLastRaiser(-1);
@@ -2195,8 +2213,9 @@ export default function Kicker() {
                 setRevealPhase(0);
                 setMessage(`${names[newDealer]} is dealer. Communal: ${communal.rank}${communal.suit}${rolloverPot > 0 ? ` (+$${rolloverPot} rollover!)` : ''}`);
                 setRolloverPot(0);
-                setShowPassScreen(true);
-                setGameState('passing');
+                // Skip pass screen in single player mode - go straight to playing
+                setShowPassScreen(false);
+                setGameState('playing');
                 setWinner(null);
                 setIsRollover(false);
                 setLastRaiser(-1);
