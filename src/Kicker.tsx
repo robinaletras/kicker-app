@@ -133,8 +133,7 @@ interface PassScreenProps {
 const PassScreen = ({ playerName, onReady }: PassScreenProps) => (
   <div className="fixed inset-0 bg-gray-900 flex flex-col items-center justify-center z-50">
     <div className="text-center p-4">
-      <h2 className="font-display text-2xl text-amber-400 mb-3">Pass to {playerName}</h2>
-      <p className="text-gray-400 mb-4 text-sm">Hand the device to {playerName}</p>
+      <h2 className="font-display text-2xl text-amber-400 mb-4">Pass to {playerName}</h2>
       <button
         onClick={onReady}
         className="px-8 py-3 bg-gradient-to-r from-emerald-600 to-emerald-500 text-white rounded-xl font-bold text-base shadow-lg hover:from-emerald-500 hover:to-emerald-400 transition-all"
