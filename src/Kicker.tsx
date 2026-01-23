@@ -392,6 +392,12 @@ export default function Kicker() {
     // Check if I pair with the board (guaranteed win or split)
     const pairsWithBoard = communalCard && communalCard.value === myCard.value;
 
+    // Get active (non-folded, non-eliminated) players
+    const activePlayers = players.filter(p => !p.folded && !p.eliminated);
+
+    // Check if all cards are revealed
+    const allCardsRevealed = activePlayers.every(p => p.revealed);
+
     // Check if any revealed card matches mine (would split with them)
     const wouldSplitWithRevealed = players.some(
       p => p.revealed && !p.folded && !p.eliminated && p.card && p.card.value === myCard.value && p !== player
@@ -407,6 +413,9 @@ export default function Kicker() {
 
     // NEVER fold if we would split or win
     const shouldNeverFold = pairsWithBoard || wouldSplitWithRevealed;
+
+    // If all cards are revealed and we're clearly beaten (higher card exists, we don't pair board, we don't split)
+    const clearlyBeaten = allCardsRevealed && revealedHigherCards.length > 0 && !pairsWithBoard && !wouldSplitWithRevealed;
 
     // If can't afford to call, must fold or go all-in
     if (!canAffordCall && toCall > 0) {
@@ -442,6 +451,10 @@ export default function Kicker() {
         if (canCheck) return { action: 'check' };
         return { action: 'call' };
       }
+      // Always fold if clearly beaten (all cards revealed and can't win)
+      if (clearlyBeaten && toCall > 0) {
+        return { action: 'fold' };
+      }
       // 30% chance to fold if there's a bet
       if (toCall > 0 && Math.random() < 0.3) {
         return { action: 'fold' };
@@ -460,7 +473,11 @@ export default function Kicker() {
     }
 
     if (aiLevel === 'aggressive') {
-      // Never folds, often bets/raises (but limited to 2 raises)
+      // Even aggressive AI folds when clearly beaten (all cards revealed and can't win)
+      if (clearlyBeaten && toCall > 0) {
+        return { action: 'fold' };
+      }
+      // Never folds otherwise, often bets/raises (but limited to 2 raises)
       if (canRaise && pairsWithBoard) {
         // Always raise big with board pair (limited by chips)
         const amount = Math.min(3, canCheck ? maxBet : maxRaise);
@@ -661,6 +678,15 @@ export default function Kicker() {
     // NEVER fold if we would split or win
     const shouldNeverFold = pairsWithBoard || wouldSplitWithRevealed;
 
+    // Get active (non-folded, non-eliminated) players
+    const activePlayers = allPlayers.filter(p => !p.folded && !p.eliminated);
+
+    // Check if all cards are revealed
+    const allCardsRevealed = activePlayers.every(p => p.revealed);
+
+    // If all cards are revealed and we're clearly beaten
+    const clearlyBeaten = allCardsRevealed && revealedHigherCards.length > 0 && !pairsWithBoard && !wouldSplitWithRevealed;
+
     if (!canAffordCall && toCall > 0) {
       if (shouldNeverFold || aiLevel === 'aggressive') return { action: 'call' };
       return { action: 'fold' };
@@ -689,6 +715,8 @@ export default function Kicker() {
         if (canCheck) return { action: 'check' };
         return { action: 'call' };
       }
+      // Always fold if clearly beaten (all cards revealed and can't win)
+      if (clearlyBeaten && toCall > 0) return { action: 'fold' };
       if (toCall > 0 && Math.random() < 0.3) return { action: 'fold' };
       if (canRaiseMore && Math.random() < 0.2) {
         const amount = Math.min(Math.floor(Math.random() * 3) + 1, canCheck ? maxBet : maxRaise);
@@ -702,6 +730,8 @@ export default function Kicker() {
     }
 
     if (aiLevel === 'aggressive') {
+      // Even aggressive AI folds when clearly beaten (all cards revealed and can't win)
+      if (clearlyBeaten && toCall > 0) return { action: 'fold' };
       if (canRaiseMore && pairsWithBoard) {
         const amount = Math.min(3, canCheck ? maxBet : maxRaise);
         if (amount > 0) {
