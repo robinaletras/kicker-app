@@ -1089,16 +1089,35 @@ export default function Kicker() {
     // Calculate side pots based on totalRoundBet
     const activePlayers = newPlayers.filter(p => !p.folded && !p.eliminated);
 
-    // If only one active player, they win everything
+    // If only one active player, check if they beat the board
     if (activePlayers.length === 1) {
-      const winner = activePlayers[0];
+      const lastPlayer = activePlayers[0];
       const potToUse = finalPot !== undefined ? finalPot : pot;
-      newPlayers = newPlayers.map(p =>
-        p.name === winner.name ? { ...p, chips: p.chips + potToUse } : p
-      );
-      setPlayers(newPlayers);
-      setWinner({ name: winner.name, isSplit: false, reason: 'Last player standing', rollover: false });
-      setRolloverPot(0);
+      const playerCard = lastPlayer.card!;
+      const boardValue = communalCard!.value;
+      const boardRank = communalCard!.rank;
+
+      // Player wins if they pair with board OR have higher card than board
+      const pairsWithBoard = playerCard.value === boardValue;
+      const beatsBoard = playerCard.value > boardValue;
+
+      if (pairsWithBoard || beatsBoard) {
+        // Player wins
+        newPlayers = newPlayers.map(p =>
+          p.name === lastPlayer.name ? { ...p, chips: p.chips + potToUse } : p
+        );
+        setPlayers(newPlayers);
+        const reason = pairsWithBoard
+          ? `Pair of ${playerCard.rank}s (with board)`
+          : `${playerCard.rank} high`;
+        setWinner({ name: lastPlayer.name, isSplit: false, reason, rollover: false });
+        setRolloverPot(0);
+      } else {
+        // Board wins - rollover
+        setPlayers(newPlayers);
+        setWinner({ name: 'Board', isSplit: false, reason: `${boardRank} high - Board wins`, rollover: true });
+        setRolloverPot(potToUse + rolloverPot);
+      }
       setGameState('winner');
       return;
     }
