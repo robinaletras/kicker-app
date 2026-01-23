@@ -1646,8 +1646,10 @@ export default function Kicker() {
     if (gameState === 'playing' && !showPassScreen && currentPlayerData && !currentPlayerData.aiLevel && !winner) {
       // Don't start timer if player has 0 chips (they'll be auto-handled)
       if (currentPlayerData.chips === 0 && !currentPlayerData.allIn) {
-        // Auto-check for broke players
+        // Auto-check for broke players - faster if playerBroke mode
+        const delay = playerBroke ? 100 : 800;
         const timer = setTimeout(() => {
+          if (winner) return; // Guard against acting after round ended
           if (currentBetAmount === 0 || currentPlayerData.currentBet >= currentBetAmount) {
             setMessage(`${currentPlayerData.name} checks (no chips)`);
             handleAction('check');
@@ -1660,7 +1662,7 @@ export default function Kicker() {
             setMessage(`${currentPlayerData.name} is all-in`);
             advanceToNextPlayer();
           }
-        }, 800);
+        }, delay);
         return () => clearTimeout(timer);
       }
       setTurnTimeRemaining(TURN_TIME_LIMIT);
@@ -1668,7 +1670,21 @@ export default function Kicker() {
     } else {
       setTurnTimerActive(false);
     }
-  }, [gameState, currentPlayer, showPassScreen, winner]);
+  }, [gameState, currentPlayer, showPassScreen, winner, playerBroke]);
+
+  // Auto-skip pass screen when playerBroke and it's human's turn
+  useEffect(() => {
+    if (!playerBroke) return;
+    if (gameState !== 'passing' || !showPassScreen) return;
+    if (!currentPlayerData || currentPlayerData.aiLevel) return; // AI handled separately
+    if (winner) return;
+
+    const timer = setTimeout(() => {
+      if (winner) return;
+      handleReady();
+    }, 100);
+    return () => clearTimeout(timer);
+  }, [playerBroke, gameState, showPassScreen, currentPlayerData?.aiLevel, winner]);
 
   // AI auto-play effect
   useEffect(() => {
