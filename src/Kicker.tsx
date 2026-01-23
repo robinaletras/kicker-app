@@ -1900,7 +1900,7 @@ export default function Kicker() {
                     setSetupNames(newNames);
                     setSetupIsAI(newIsAI);
                   }}
-                  placeholder={i < 2 ? `Player ${i + 1} (required)` : `Player ${i + 1} (optional)`}
+                  placeholder={`Player ${i + 1}`}
                   className={`flex-1 px-3 py-2 bg-gray-800 border-2 rounded-lg text-white text-sm focus:outline-none ${
                     setupIsAI[i]
                       ? 'border-cyan-500 focus:border-cyan-400'
