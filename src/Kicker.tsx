@@ -2607,27 +2607,27 @@ export default function Kicker() {
               {!currentPlayerData.aiLevel && (
                 <>
                   {/* Actions */}
-                  <div className="space-y-1.5">
+                  <div className="space-y-3">
                 {canBet && (
-                  <div className="grid grid-cols-3 gap-1.5">
+                  <div className="grid grid-cols-3 gap-3">
                     <button
                       onClick={() => handleAction('bet', 1)}
                       disabled={currentPlayerData.chips < 1}
-                      className={`px-2 py-2 rounded-lg text-sm font-bold transition-colors ${currentPlayerData.chips >= 1 ? 'bg-green-600 hover:bg-green-500' : 'bg-gray-600 opacity-50 cursor-not-allowed'}`}
+                      className={`px-3 py-4 rounded-xl text-base font-bold transition-colors ${currentPlayerData.chips >= 1 ? 'bg-green-600 hover:bg-green-500' : 'bg-gray-600 opacity-50 cursor-not-allowed'}`}
                     >
                       Bet $1
                     </button>
                     <button
                       onClick={() => handleAction('bet', 2)}
                       disabled={currentPlayerData.chips < 2}
-                      className={`px-2 py-2 rounded-lg text-sm font-bold transition-colors ${currentPlayerData.chips >= 2 ? 'bg-green-600 hover:bg-green-500' : 'bg-gray-600 opacity-50 cursor-not-allowed'}`}
+                      className={`px-3 py-4 rounded-xl text-base font-bold transition-colors ${currentPlayerData.chips >= 2 ? 'bg-green-600 hover:bg-green-500' : 'bg-gray-600 opacity-50 cursor-not-allowed'}`}
                     >
                       Bet $2
                     </button>
                     <button
                       onClick={() => handleAction('bet', 3)}
                       disabled={currentPlayerData.chips < 3}
-                      className={`px-2 py-2 rounded-lg text-sm font-bold transition-colors ${currentPlayerData.chips >= 3 ? 'bg-green-600 hover:bg-green-500' : 'bg-gray-600 opacity-50 cursor-not-allowed'}`}
+                      className={`px-3 py-4 rounded-xl text-base font-bold transition-colors ${currentPlayerData.chips >= 3 ? 'bg-green-600 hover:bg-green-500' : 'bg-gray-600 opacity-50 cursor-not-allowed'}`}
                     >
                       Bet $3
                     </button>
@@ -2637,50 +2637,50 @@ export default function Kicker() {
                 {canCall && currentPlayerData.chips > 0 && (
                   <button
                     onClick={() => handleAction('call')}
-                    className="w-full px-2 py-2 bg-blue-600 hover:bg-blue-500 rounded-lg text-sm font-bold transition-colors"
+                    className="w-full px-3 py-4 bg-blue-600 hover:bg-blue-500 rounded-xl text-base font-bold transition-colors"
                   >
                     {currentPlayerData.chips >= toCall ? `Call $${toCall}` : `All-in $${currentPlayerData.chips}`}
                   </button>
                 )}
 
                 {canRaise && (
-                  <div className="grid grid-cols-3 gap-1.5">
+                  <div className="grid grid-cols-3 gap-3">
                     <button
                       onClick={() => handleAction('raise', 1)}
                       disabled={currentPlayerData.chips < toCall + 1}
-                      className={`px-2 py-2 rounded-lg text-sm font-bold transition-colors ${currentPlayerData.chips >= toCall + 1 ? 'bg-orange-600 hover:bg-orange-500' : 'bg-gray-600 opacity-50 cursor-not-allowed'}`}
+                      className={`px-3 py-4 rounded-xl text-base font-bold transition-colors ${currentPlayerData.chips >= toCall + 1 ? 'bg-orange-600 hover:bg-orange-500' : 'bg-gray-600 opacity-50 cursor-not-allowed'}`}
                     >
                       +$1
                     </button>
                     <button
                       onClick={() => handleAction('raise', 2)}
                       disabled={currentPlayerData.chips < toCall + 2}
-                      className={`px-2 py-2 rounded-lg text-sm font-bold transition-colors ${currentPlayerData.chips >= toCall + 2 ? 'bg-orange-600 hover:bg-orange-500' : 'bg-gray-600 opacity-50 cursor-not-allowed'}`}
+                      className={`px-3 py-4 rounded-xl text-base font-bold transition-colors ${currentPlayerData.chips >= toCall + 2 ? 'bg-orange-600 hover:bg-orange-500' : 'bg-gray-600 opacity-50 cursor-not-allowed'}`}
                     >
                       +$2
                     </button>
                     <button
                       onClick={() => handleAction('raise', 3)}
                       disabled={currentPlayerData.chips < toCall + 3}
-                      className={`px-2 py-2 rounded-lg text-sm font-bold transition-colors ${currentPlayerData.chips >= toCall + 3 ? 'bg-orange-600 hover:bg-orange-500' : 'bg-gray-600 opacity-50 cursor-not-allowed'}`}
+                      className={`px-3 py-4 rounded-xl text-base font-bold transition-colors ${currentPlayerData.chips >= toCall + 3 ? 'bg-orange-600 hover:bg-orange-500' : 'bg-gray-600 opacity-50 cursor-not-allowed'}`}
                     >
                       +$3
                     </button>
                   </div>
                 )}
 
-                <div className={`grid ${canCheck ? 'grid-cols-2' : 'grid-cols-1'} gap-1.5`}>
+                <div className={`grid ${canCheck ? 'grid-cols-2' : 'grid-cols-1'} gap-3`}>
                   {canCheck && (
                     <button
                       onClick={() => handleAction('check')}
-                      className="px-2 py-2 bg-gray-600 hover:bg-gray-500 rounded-lg text-sm font-bold transition-colors"
+                      className="px-3 py-4 bg-gray-600 hover:bg-gray-500 rounded-xl text-base font-bold transition-colors"
                     >
                       Check
                     </button>
                   )}
                   <button
                     onClick={() => handleAction('fold')}
-                    className="px-2 py-2 bg-red-600 hover:bg-red-500 rounded-lg text-sm font-bold transition-colors"
+                    className="px-3 py-4 bg-red-600 hover:bg-red-500 rounded-xl text-base font-bold transition-colors"
                   >
                     Fold
                   </button>
