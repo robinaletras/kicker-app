@@ -758,22 +758,23 @@ export default function Kicker() {
     const playerList = playersToCheck || players;
     // Players who can WIN the pot (not folded, not eliminated)
     const activePlayers = playerList.filter(p => !p.folded && !p.eliminated);
-    // ALL players with cards (including eliminated) - their cards still count in the hand
-    const playersWithCards = playerList.filter(p => p.card && !p.folded);
+    // ALL players with cards - their cards still count for hand evaluation even if folded
+    const playersWithCards = playerList.filter(p => p.card);
     const boardValue = communalCard!.value;
     const boardRank = communalCard!.rank;
     const boardSuit = communalCard!.suit;
 
-    // Collect all cards with suits for hand evaluation - include eliminated players' cards
+    // Collect all cards with suits for hand evaluation - include ALL player cards (even folded)
     const allCards = [
-      { value: boardValue, rank: boardRank, suit: boardSuit, isBoard: true, player: null as Player | null, eliminated: false },
+      { value: boardValue, rank: boardRank, suit: boardSuit, isBoard: true, player: null as Player | null, eliminated: false, folded: false },
       ...playersWithCards.map(p => ({
         value: p.card!.value,
         rank: p.card!.rank,
         suit: p.card!.suit,
         isBoard: false,
         player: p,
-        eliminated: p.eliminated
+        eliminated: p.eliminated,
+        folded: p.folded
       }))
     ];
 
@@ -864,12 +865,12 @@ export default function Kicker() {
     // Helper to determine winner - the player who MADE the hand wins
     // If multiple players made the hand, they SPLIT (shared kicker)
     // If no kicker exists (all cards used), then ROLLOVER
-    // NOTE: Eliminated players' cards count for making the hand but they can't WIN
+    // NOTE: Eliminated/folded players' cards count for making the hand but they can't WIN
     const resolveByHandMaker = (handDescription: string, usedValues: Set<number>, handMakers: Player[]): Winner => {
       const kickerDesc = getKickerDescription(usedValues);
       const hasKicker = kickerDesc !== '';
-      // Filter out eliminated players - they can't win
-      const eligibleWinners = handMakers.filter(p => !p.eliminated);
+      // Filter out eliminated and folded players - they can't win
+      const eligibleWinners = handMakers.filter(p => !p.eliminated && !p.folded);
       console.log('resolveByHandMaker:', handDescription, 'handMakers:', handMakers.map(p => p.name), 'eligibleWinners:', eligibleWinners.map(p => p.name), 'hasKicker:', hasKicker);
 
       if (eligibleWinners.length === 1) {
@@ -913,14 +914,14 @@ export default function Kicker() {
       if (highCard?.isBoard) {
         return { name: 'Board', isSplit: false, reason: `${handDescription} - Board high`, rollover: true };
       }
-      // Skip eliminated players
-      if (highCard?.player && !highCard.eliminated) {
+      // Skip eliminated and folded players
+      if (highCard?.player && !highCard.eliminated && !highCard.folded) {
         return { name: highCard.player.name, isSplit: false, reason: handDescription, rollover: false };
       }
       // Find eligible player with highest card in the straight
       const sortedByValue = [...allCards].sort((a, b) => b.value - a.value);
       for (const card of sortedByValue) {
-        if (!card.isBoard && card.player && !card.eliminated) {
+        if (!card.isBoard && card.player && !card.eliminated && !card.folded) {
           return { name: card.player.name, isSplit: false, reason: handDescription, rollover: false };
         }
       }
@@ -950,7 +951,7 @@ export default function Kicker() {
     // 4. Flush
     if (isFlush) {
       const handDescription = `Flush (${flushSuit})`;
-      // Highest card in flush determines winner - skip eliminated players
+      // Highest card in flush determines winner - skip eliminated/folded players
       const sortedByValue = [...allCards].sort((a, b) => b.value - a.value);
 
       // Find highest eligible card
@@ -959,7 +960,7 @@ export default function Kicker() {
           // Board is high - find next eligible player card
           continue;
         }
-        if (card.player && !card.eliminated) {
+        if (card.player && !card.eliminated && !card.folded) {
           return { name: card.player.name, isSplit: false, reason: `${handDescription}, ${card.rank} high`, rollover: false };
         }
       }
@@ -970,7 +971,7 @@ export default function Kicker() {
     // 5. Straight
     if (isStraight) {
       const handDescription = isWheel ? 'Straight (Wheel)' : 'Straight';
-      // Highest card determines winner (or 5 for wheel) - skip eliminated players
+      // Highest card determines winner (or 5 for wheel) - skip eliminated/folded players
       const sortedByValue = [...allCards].sort((a, b) => b.value - a.value);
 
       // Find highest eligible card
@@ -978,7 +979,7 @@ export default function Kicker() {
         if (card.isBoard) {
           continue;
         }
-        if (card.player && !card.eliminated) {
+        if (card.player && !card.eliminated && !card.folded) {
           return { name: card.player.name, isSplit: false, reason: `${handDescription}, ${card.rank} high`, rollover: false };
         }
       }
@@ -1050,15 +1051,15 @@ export default function Kicker() {
     console.log('Fell through to HIGH CARD - no pairs/trips detected!');
     const sortedCards = [...allCards].sort((a, b) => b.value - a.value);
 
-    // Find highest eligible card (skip board and eliminated players)
+    // Find highest eligible card (skip board, eliminated, and folded players)
     for (const card of sortedCards) {
       if (card.isBoard) {
         // If board is highest, it's a rollover
         console.log('Board has high card - rollover');
         return { name: 'Board', isSplit: false, reason: `${boardRank} high - Board wins`, rollover: true };
       }
-      if (card.eliminated) {
-        // Skip eliminated players' cards
+      if (card.eliminated || card.folded) {
+        // Skip eliminated and folded players' cards for winning
         continue;
       }
       // Found highest eligible player card
