@@ -1704,7 +1704,7 @@ export default function Kicker() {
   // Background music control
   useEffect(() => {
     if (!audioRef.current) {
-      audioRef.current = new Audio('/Slow Shuffle, Easy Money.mp3');
+      audioRef.current = new Audio('/music.mp3');
       audioRef.current.loop = true;
       audioRef.current.volume = 0.3;
     }
