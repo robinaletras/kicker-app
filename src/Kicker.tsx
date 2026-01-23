@@ -2563,13 +2563,19 @@ export default function Kicker() {
 
               {/* Fixed Dashboard Layout - All buttons always visible */}
               <div className="space-y-3">
-                {/* Row 1: Bet buttons */}
+                {/* Row 1: Bet/Raise buttons (merged) */}
                 <div className="grid grid-cols-3 gap-3">
                   {[1, 2, 3].map(amount => {
                     const isAI = !!currentPlayerData.aiLevel;
-                    const isSelected = isAI && aiPendingAction?.action === 'bet' && aiPendingAction?.amount === amount;
-                    const canAfford = currentPlayerData.chips >= amount;
-                    const isActive = canBet && canAfford;
+                    const isBetSelected = isAI && aiPendingAction?.action === 'bet' && aiPendingAction?.amount === amount;
+                    const isRaiseSelected = isAI && aiPendingAction?.action === 'raise' && aiPendingAction?.amount === amount;
+                    const isSelected = isBetSelected || isRaiseSelected;
+                    const canAffordBet = currentPlayerData.chips >= amount;
+                    const canAffordRaise = currentPlayerData.chips >= toCall + amount;
+                    const canDoBet = canBet && canAffordBet;
+                    const canDoRaise = canRaise && canAffordRaise;
+                    const isActive = canDoBet || canDoRaise;
+                    const action = canBet ? 'bet' : 'raise';
 
                     if (isAI) {
                       return (
@@ -2583,20 +2589,20 @@ export default function Kicker() {
                                 : 'bg-gray-800/50 text-gray-600'
                           }`}
                         >
-                          Bet ${amount}
+                          +${amount}
                         </div>
                       );
                     }
                     return (
                       <button
                         key={amount}
-                        onClick={() => handleAction('bet', amount)}
+                        onClick={() => handleAction(action, amount)}
                         disabled={!isActive}
                         className={`px-3 py-4 rounded-xl text-base font-bold transition-colors ${
                           isActive ? 'bg-green-600 hover:bg-green-500' : 'bg-gray-800/50 text-gray-600 cursor-not-allowed'
                         }`}
                       >
-                        Bet ${amount}
+                        +${amount}
                       </button>
                     );
                   })}
@@ -2639,46 +2645,7 @@ export default function Kicker() {
                   );
                 })()}
 
-                {/* Row 3: Raise buttons */}
-                <div className="grid grid-cols-3 gap-3">
-                  {[1, 2, 3].map(amount => {
-                    const isAI = !!currentPlayerData.aiLevel;
-                    const isSelected = isAI && aiPendingAction?.action === 'raise' && aiPendingAction?.amount === amount;
-                    const canAfford = currentPlayerData.chips >= toCall + amount;
-                    const isActive = canRaise && canAfford;
-
-                    if (isAI) {
-                      return (
-                        <div
-                          key={amount}
-                          className={`px-3 py-4 rounded-xl text-base font-bold text-center transition-all duration-300 ${
-                            isSelected
-                              ? 'bg-orange-400 text-orange-900 scale-105 ring-2 ring-orange-300 shadow-lg'
-                              : isActive
-                                ? 'bg-orange-600/50 text-orange-200'
-                                : 'bg-gray-800/50 text-gray-600'
-                          }`}
-                        >
-                          +${amount}
-                        </div>
-                      );
-                    }
-                    return (
-                      <button
-                        key={amount}
-                        onClick={() => handleAction('raise', amount)}
-                        disabled={!isActive}
-                        className={`px-3 py-4 rounded-xl text-base font-bold transition-colors ${
-                          isActive ? 'bg-orange-600 hover:bg-orange-500' : 'bg-gray-800/50 text-gray-600 cursor-not-allowed'
-                        }`}
-                      >
-                        +${amount}
-                      </button>
-                    );
-                  })}
-                </div>
-
-                {/* Row 4: Check and Fold */}
+                {/* Row 3: Check and Fold */}
                 <div className="grid grid-cols-2 gap-3">
                   {(() => {
                     const isAI = !!currentPlayerData.aiLevel;
