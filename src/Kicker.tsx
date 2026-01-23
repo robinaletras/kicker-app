@@ -2071,7 +2071,7 @@ export default function Kicker() {
       {gameState === 'setup' && (
         <div className="flex-1 flex flex-col items-center justify-center p-4">
           <h2 className="font-display text-2xl text-amber-400 mb-2">Pass & Play</h2>
-          <p className="text-gray-400 text-sm mb-2">Enter player names (2-4 players)</p>
+          <p className="text-gray-400 text-sm mb-2">Enter player names (1-4 players)</p>
           <p className="text-cyan-400 text-xs mb-6">Type "ai" for a random AI personality</p>
 
           <div className="w-full max-w-xs space-y-3 mb-6">
@@ -2149,7 +2149,7 @@ export default function Kicker() {
                   }
                 });
 
-                if (processedNames.length < 2) return;
+                if (processedNames.length < 1) return;
 
                 // Pad to 4 players with empty slots that will be marked as eliminated
                 const finalNames = processedNames.map(p => p.name);
