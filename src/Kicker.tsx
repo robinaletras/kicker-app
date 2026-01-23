@@ -270,14 +270,13 @@ const WinnerScreen = ({ winner, pot, players, boardCard, onNextRound, rollover, 
 );
 
 type GameState = 'menu' | 'lobby' | 'setup' | 'passing' | 'playing' | 'winner';
-type Action = 'bet' | 'call' | 'raise' | 'check' | 'fold' | 'peek' | 'allIn';
+type Action = 'bet' | 'call' | 'raise' | 'check' | 'fold' | 'allIn';
 
 // Turn timer constants
 const TURN_TIME_LIMIT = 15; // seconds
 
 export default function Kicker() {
   const [gameState, setGameState] = useState<GameState>('menu');
-  const [deck, setDeck] = useState<CardType[]>([]);
   const [communalCard, setCommunalCard] = useState<CardType | null>(null);
   const [players, setPlayers] = useState<Player[]>([
     { name: 'Player 1', chips: 50, card: null, revealed: false, folded: false, eliminated: false, peekedCards: [], currentBet: 0, totalRoundBet: 0, allIn: false },
@@ -298,7 +297,6 @@ export default function Kicker() {
   const [isRollover, setIsRollover] = useState(false);
   const [playerBroke, setPlayerBroke] = useState(false); // Human player ran out of money
   const winnerRef = useRef<Winner | null>(null); // Track winner for closures
-  const processingRef = useRef(false); // Prevent concurrent actions
   const [playerNames, setPlayerNames] = useState(['Player 1', 'Player 2', 'Player 3', 'Player 4']);
   const [isPlayerAI, setIsPlayerAI] = useState([false, false, false, false]);
   const [setupNames, setSetupNames] = useState(['', '', '', '']); // Pass & Play setup names
@@ -1428,20 +1426,6 @@ export default function Kicker() {
       );
       actionMessage = `${player.name} folded`;
       setMessage(actionMessage);
-    } else if (action === 'peek') {
-      if (deck.length > 0) {
-        const newDeck = [...deck];
-        const peeked = newDeck.pop()!;
-        newPlayers = newPlayers.map((p, i) =>
-          i === currentPlayer ? { ...p, peekedCards: [...p.peekedCards, peeked], chips: p.chips - 1 } : p
-        );
-        newPot = pot + 1;
-        setDeck(newDeck);
-        setPot(newPot);
-        setPlayers(newPlayers);
-        setMessage(`${player.name} peeked at a card`);
-        return;
-      }
     }
 
     // Record action (not during replay)
@@ -1521,7 +1505,6 @@ export default function Kicker() {
     const initialPot = playingCount + rolloverPot;
 
     setDealer(nextDealer);
-    setDeck(newDeck);
     setCommunalCard(communal);
     setPlayers(newPlayers);
     setPot(initialPot);
@@ -1648,12 +1631,8 @@ export default function Kicker() {
     if (gameState === 'playing' && !showPassScreen && currentPlayerData && !currentPlayerData.aiLevel && !winner) {
       // Don't start timer if player has 0 chips (they'll be auto-handled)
       if (currentPlayerData.chips === 0 && !currentPlayerData.allIn) {
-        if (processingRef.current) return; // Already processing
-        // Auto-check for broke players - faster if playerBroke mode
-        const delay = playerBroke ? 150 : 800;
-        processingRef.current = true;
+        // Auto-check for broke players
         const timer = setTimeout(() => {
-          processingRef.current = false;
           if (winnerRef.current) return; // Round ended
           if (currentBetAmount === 0 || currentPlayerData.currentBet >= currentBetAmount) {
             setMessage(`${currentPlayerData.name} checks (no chips)`);
@@ -1667,32 +1646,15 @@ export default function Kicker() {
             setMessage(`${currentPlayerData.name} is all-in`);
             advanceToNextPlayer();
           }
-        }, delay);
-        return () => { clearTimeout(timer); processingRef.current = false; };
+        }, 800);
+        return () => clearTimeout(timer);
       }
       setTurnTimeRemaining(TURN_TIME_LIMIT);
       setTurnTimerActive(true);
     } else {
       setTurnTimerActive(false);
     }
-  }, [gameState, currentPlayer, showPassScreen, winner, playerBroke]);
-
-  // Auto-skip pass screen when playerBroke and it's human's turn
-  useEffect(() => {
-    if (!playerBroke) return;
-    if (gameState !== 'passing' || !showPassScreen) return;
-    if (!currentPlayerData || currentPlayerData.aiLevel) return; // AI handled separately
-    if (winner) return;
-    if (processingRef.current) return;
-
-    processingRef.current = true;
-    const timer = setTimeout(() => {
-      processingRef.current = false;
-      if (winnerRef.current) return;
-      handleReady();
-    }, 150);
-    return () => { clearTimeout(timer); processingRef.current = false; };
-  }, [playerBroke, gameState, showPassScreen, currentPlayerData?.aiLevel, winner]);
+  }, [gameState, currentPlayer, showPassScreen, winner]);
 
   // AI auto-play effect
   useEffect(() => {
@@ -1701,31 +1663,7 @@ export default function Kicker() {
     if (!currentPlayerData?.aiLevel) return;
     if (winner) return;
 
-    // If player is broke, run AI with minimal delay (fast but not synchronous to avoid loops)
-    if (playerBroke) {
-      if (processingRef.current) return; // Already processing
-      if (showPassScreen && gameState === 'passing') {
-        processingRef.current = true;
-        const timer = setTimeout(() => {
-          processingRef.current = false;
-          if (winnerRef.current) return; // Round ended
-          handleReady();
-        }, 150);
-        return () => { clearTimeout(timer); processingRef.current = false; };
-      }
-      if (gameState === 'playing' && !showPassScreen) {
-        processingRef.current = true;
-        const timer = setTimeout(() => {
-          processingRef.current = false;
-          if (winnerRef.current) return; // Round ended
-          const decision = makeAIDecision(currentPlayerData, currentPlayer);
-          handleAction(decision.action, decision.amount || 0);
-        }, 150);
-        return () => { clearTimeout(timer); processingRef.current = false; };
-      }
-    }
-
-    // Normal timing - Base timings (ms) multiplied by aiSpeed
+    // Base timings (ms) multiplied by aiSpeed
     const passDelay = 1200 * aiSpeed;
     const thinkDelay = 1000 * aiSpeed;
     const executeDelay = 1500 * aiSpeed;
@@ -1756,7 +1694,7 @@ export default function Kicker() {
         return () => clearTimeout(timer);
       }
     }
-  }, [gameState, currentPlayer, showPassScreen, currentPlayerData?.aiLevel, winner, aiPendingAction, autoAI, aiSpeed, playerBroke]);
+  }, [gameState, currentPlayer, showPassScreen, currentPlayerData?.aiLevel, winner, aiPendingAction, autoAI, aiSpeed]);
 
   // Clear pending action when player changes
   useEffect(() => {
@@ -2040,7 +1978,6 @@ export default function Kicker() {
                   firstToAct = (firstToAct + 1) % 4;
                 }
 
-                setDeck(newDeck);
                 setCommunalCard(communal);
                 setPlayers(newPlayers);
                 setPot(processedNames.length); // 1 ante per active player
@@ -2213,7 +2150,6 @@ export default function Kicker() {
                 // Find first player after dealer
                 let firstToAct = (newDealer + 1) % 4;
 
-                setDeck(newDeck);
                 setCommunalCard(communal);
                 setPlayers(newPlayers);
                 setPot(4 + rolloverPot); // 4 antes
@@ -2464,17 +2400,8 @@ export default function Kicker() {
                     </div>
                   )}
 
-                  {/* Bottom row: Peek, Check, Fold */}
-                  <div className={`grid ${canCheck ? 'grid-cols-3' : 'grid-cols-2'} gap-1.5`}>
-                    <div
-                      className={`px-2 py-2 rounded-lg text-sm font-bold text-center transition-all duration-300 ${
-                        aiPendingAction?.action === 'peek'
-                          ? 'bg-purple-400 text-purple-900 scale-110 ring-2 ring-purple-300 shadow-lg shadow-purple-500/50'
-                          : aiPendingAction ? 'bg-purple-900/30 text-purple-700' : 'bg-purple-600/50 text-purple-200'
-                      }`}
-                    >
-                      Peek $1
-                    </div>
+                  {/* Bottom row: Check, Fold */}
+                  <div className={`grid ${canCheck ? 'grid-cols-2' : 'grid-cols-1'} gap-1.5`}>
                     {canCheck && (
                       <div
                         className={`px-2 py-2 rounded-lg text-sm font-bold text-center transition-all duration-300 ${
@@ -2502,18 +2429,6 @@ export default function Kicker() {
               {/* Human Player Controls */}
               {!currentPlayerData.aiLevel && (
                 <>
-                  {/* Peeked Cards */}
-                  {currentPlayerData.peekedCards.length > 0 && (
-                    <div className="mb-1">
-                      <div className="text-[10px] text-gray-400 text-center">Peeked</div>
-                      <div className="flex gap-1 justify-center">
-                        {currentPlayerData.peekedCards.map((card, i) => (
-                          <Card key={i} card={card} small />
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
                   {/* Actions */}
                   <div className="space-y-1.5">
                 {canBet && (
@@ -2577,14 +2492,7 @@ export default function Kicker() {
                   </div>
                 )}
 
-                <div className={`grid ${canCheck ? 'grid-cols-3' : 'grid-cols-2'} gap-1.5`}>
-                  <button
-                    onClick={() => handleAction('peek')}
-                    disabled={currentPlayerData.chips < 1}
-                    className={`px-2 py-2 rounded-lg text-sm font-bold transition-colors ${currentPlayerData.chips >= 1 ? 'bg-purple-600 hover:bg-purple-500' : 'bg-gray-600 opacity-50 cursor-not-allowed'}`}
-                  >
-                    Peek $1
-                  </button>
+                <div className={`grid ${canCheck ? 'grid-cols-2' : 'grid-cols-1'} gap-1.5`}>
                   {canCheck && (
                     <button
                       onClick={() => handleAction('check')}
