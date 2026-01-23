@@ -154,9 +154,11 @@ interface WinnerScreenProps {
   rollover: boolean;
   onReplay?: () => void;
   onNewGame?: () => void;
+  playerBroke?: boolean;
+  onReloadFunds?: () => void;
 }
 
-const WinnerScreen = ({ winner, pot, players, boardCard, onNextRound, rollover, onReplay, onNewGame }: WinnerScreenProps) => (
+const WinnerScreen = ({ winner, pot, players, boardCard, onNextRound, rollover, onReplay, onNewGame, playerBroke, onReloadFunds }: WinnerScreenProps) => (
   <div className="fixed inset-0 bg-gray-900/95 flex flex-col items-center justify-center z-50">
     <div className="text-center p-4 max-w-md">
       {rollover ? (
@@ -216,27 +218,51 @@ const WinnerScreen = ({ winner, pot, players, boardCard, onNextRound, rollover, 
       </div>
 
       <div className="flex flex-col gap-2">
-        <button
-          onClick={onNextRound}
-          className="px-8 py-3 bg-gradient-to-r from-amber-500 to-yellow-400 text-gray-900 rounded-xl font-bold text-base shadow-lg hover:from-amber-400 hover:to-yellow-300 transition-all"
-        >
-          Next Round
-        </button>
-        {onReplay && (
-          <button
-            onClick={onReplay}
-            className="px-8 py-2 bg-gradient-to-r from-cyan-600 to-cyan-500 text-white rounded-xl font-bold text-sm shadow-lg hover:from-cyan-500 hover:to-cyan-400 transition-all"
-          >
-            Replay Last Round
-          </button>
-        )}
-        {onNewGame && (
-          <button
-            onClick={onNewGame}
-            className="px-8 py-2 text-gray-400 hover:text-gray-200 text-sm transition-colors"
-          >
-            ← New Game
-          </button>
+        {playerBroke ? (
+          <>
+            <p className="text-red-400 font-bold text-lg mb-2">You're out of money!</p>
+            {onReloadFunds && (
+              <button
+                onClick={onReloadFunds}
+                className="px-8 py-3 bg-gradient-to-r from-emerald-600 to-emerald-500 text-white rounded-xl font-bold text-base shadow-lg hover:from-emerald-500 hover:to-emerald-400 transition-all"
+              >
+                Reload Funds
+              </button>
+            )}
+            {onNewGame && (
+              <button
+                onClick={onNewGame}
+                className="px-8 py-2 text-gray-400 hover:text-gray-200 text-sm transition-colors"
+              >
+                ← New Game
+              </button>
+            )}
+          </>
+        ) : (
+          <>
+            <button
+              onClick={onNextRound}
+              className="px-8 py-3 bg-gradient-to-r from-amber-500 to-yellow-400 text-gray-900 rounded-xl font-bold text-base shadow-lg hover:from-amber-400 hover:to-yellow-300 transition-all"
+            >
+              Next Round
+            </button>
+            {onReplay && (
+              <button
+                onClick={onReplay}
+                className="px-8 py-2 bg-gradient-to-r from-cyan-600 to-cyan-500 text-white rounded-xl font-bold text-sm shadow-lg hover:from-cyan-500 hover:to-cyan-400 transition-all"
+              >
+                Replay Last Round
+              </button>
+            )}
+            {onNewGame && (
+              <button
+                onClick={onNewGame}
+                className="px-8 py-2 text-gray-400 hover:text-gray-200 text-sm transition-colors"
+              >
+                ← New Game
+              </button>
+            )}
+          </>
         )}
       </div>
     </div>
@@ -271,8 +297,6 @@ export default function Kicker() {
   const [winner, setWinner] = useState<Winner | null>(null);
   const [isRollover, setIsRollover] = useState(false);
   const [playerBroke, setPlayerBroke] = useState(false); // Human player ran out of money
-  const [showBrokeScreen, setShowBrokeScreen] = useState(false); // "You're out of money" screen
-  const [showResetScreen, setShowResetScreen] = useState(false); // "Money has been reset" screen
   const [playerNames, setPlayerNames] = useState(['Player 1', 'Player 2', 'Player 3', 'Player 4']);
   const [isPlayerAI, setIsPlayerAI] = useState([false, false, false, false]);
   const [setupNames, setSetupNames] = useState(['', '', '', '']); // Pass & Play setup names
@@ -310,6 +334,7 @@ export default function Kicker() {
   const [seatedPlayers, setSeatedPlayers] = useState<(string | null)[]>([null, null, null, null]);
   const [localPlayerSeat, setLocalPlayerSeat] = useState<number | null>(null);
   const [localPlayerName, setLocalPlayerName] = useState('');
+  const [spectatorMode, setSpectatorMode] = useState(false); // Hidden: type "ai" to watch AI play
 
   const AI_NAMES = [
     'Alex', 'Sam', 'Jordan', 'Taylor', 'Casey',
@@ -1101,10 +1126,6 @@ export default function Kicker() {
 
     if (humanPlayer.chips <= 0 && !humanWon) {
       setPlayerBroke(true);
-      setShowBrokeScreen(true);
-      setRolloverPot(totalRollover);
-      setIsRollover(totalRollover > 0);
-      return; // Don't show winner screen, show broke screen instead
     }
 
     setWinner(mainWinner);
@@ -1143,7 +1164,7 @@ export default function Kicker() {
 
   const advanceToNextPlayer = (updatedPlayers?: Player[], updatedPot?: number, newLastRaiser?: number, newCurrentBet?: number) => {
     // Don't advance if game/round has ended
-    if (winner || showBrokeScreen) return;
+    if (winner) return;
 
     const playersToUse = updatedPlayers || players;
     const potToUse = updatedPot !== undefined ? updatedPot : pot;
@@ -1312,7 +1333,7 @@ export default function Kicker() {
 
   const handleAction = (action: Action, amount = 0) => {
     // Don't allow actions after the game/round has ended
-    if (winner || showBrokeScreen) return;
+    if (winner) return;
 
     // Stop turn timer when action is taken
     setTurnTimerActive(false);
@@ -1439,6 +1460,7 @@ export default function Kicker() {
       setSeatedPlayers([null, null, null, null]);
       setLocalPlayerSeat(null);
       setLocalPlayerName('');
+      setSpectatorMode(false);
       setPlayers([
         { name: 'Player 1', chips: 50, card: null, revealed: false, folded: false, eliminated: false, peekedCards: [], currentBet: 0, totalRoundBet: 0, allIn: false },
         { name: 'Player 2', chips: 50, card: null, revealed: false, folded: false, eliminated: false, peekedCards: [], currentBet: 0, totalRoundBet: 0, allIn: false },
@@ -1623,7 +1645,7 @@ export default function Kicker() {
 
   // Start turn timer when it's a human's turn
   useEffect(() => {
-    if (gameState === 'playing' && !showPassScreen && currentPlayerData && !currentPlayerData.aiLevel && !winner && !showBrokeScreen) {
+    if (gameState === 'playing' && !showPassScreen && currentPlayerData && !currentPlayerData.aiLevel && !winner) {
       // Don't start timer if player has 0 chips (they'll be auto-handled)
       if (currentPlayerData.chips === 0 && !currentPlayerData.allIn) {
         // Auto-check for broke players
@@ -1648,7 +1670,7 @@ export default function Kicker() {
     } else {
       setTurnTimerActive(false);
     }
-  }, [gameState, currentPlayer, showPassScreen, winner, showBrokeScreen]);
+  }, [gameState, currentPlayer, showPassScreen, winner]);
 
   // AI auto-play effect
   useEffect(() => {
@@ -1656,7 +1678,6 @@ export default function Kicker() {
     if (gameState !== 'playing' && gameState !== 'passing') return;
     if (!currentPlayerData?.aiLevel) return;
     if (winner) return;
-    if (showBrokeScreen) return; // Don't run AI after round ended with broke screen
 
     // If player is broke, run AI instantly
     if (playerBroke) {
@@ -1702,7 +1723,7 @@ export default function Kicker() {
         return () => clearTimeout(timer);
       }
     }
-  }, [gameState, currentPlayer, showPassScreen, currentPlayerData?.aiLevel, winner, aiPendingAction, autoAI, aiSpeed, playerBroke, showBrokeScreen]);
+  }, [gameState, currentPlayer, showPassScreen, currentPlayerData?.aiLevel, winner, aiPendingAction, autoAI, aiSpeed, playerBroke]);
 
   // Clear pending action when player changes
   useEffect(() => {
@@ -1816,57 +1837,6 @@ export default function Kicker() {
         .font-display { font-family: 'Playfair Display', serif; }
         .font-body { font-family: 'Source Sans Pro', sans-serif; }
       `}</style>
-
-      {/* BROKE SCREEN - Player ran out of money */}
-      {showBrokeScreen && (
-        <div className="fixed inset-0 bg-gray-900/95 flex flex-col items-center justify-center z-50">
-          <div className="text-center p-6 max-w-sm">
-            <h2 className="font-display text-3xl text-red-400 mb-4">Out of Money!</h2>
-            <p className="text-gray-300 text-lg mb-8">You've lost all your chips.</p>
-            <button
-              onClick={() => {
-                setShowBrokeScreen(false);
-                setShowResetScreen(true);
-              }}
-              className="px-8 py-3 bg-gradient-to-r from-gray-600 to-gray-500 text-white rounded-xl font-bold text-base shadow-lg hover:from-gray-500 hover:to-gray-400 transition-all"
-            >
-              Main Menu
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* RESET SCREEN - Money has been reset */}
-      {showResetScreen && (
-        <div className="fixed inset-0 bg-gray-900/95 flex flex-col items-center justify-center z-50">
-          <div className="text-center p-6 max-w-sm">
-            <h2 className="font-display text-2xl text-emerald-400 mb-4">Money Reset</h2>
-            <p className="text-gray-300 text-lg mb-8">Your chips have been reset to $50.</p>
-            <button
-              onClick={() => {
-                setShowResetScreen(false);
-                setPlayerBroke(false);
-                setGameState('menu');
-                setSeatedPlayers([null, null, null, null]);
-                setLocalPlayerSeat(null);
-                setLocalPlayerName('');
-                setPlayers([
-                  { name: 'Player 1', chips: 50, card: null, revealed: false, folded: false, eliminated: false, peekedCards: [], currentBet: 0, totalRoundBet: 0, allIn: false },
-                  { name: 'Player 2', chips: 50, card: null, revealed: false, folded: false, eliminated: false, peekedCards: [], currentBet: 0, totalRoundBet: 0, allIn: false },
-                  { name: 'Player 3', chips: 50, card: null, revealed: false, folded: false, eliminated: false, peekedCards: [], currentBet: 0, totalRoundBet: 0, allIn: false },
-                  { name: 'Player 4', chips: 50, card: null, revealed: false, folded: false, eliminated: false, peekedCards: [], currentBet: 0, totalRoundBet: 0, allIn: false },
-                ]);
-                setPot(0);
-                setRolloverPot(0);
-                setWinner(null);
-              }}
-              className="px-8 py-3 bg-gradient-to-r from-emerald-600 to-emerald-500 text-white rounded-xl font-bold text-base shadow-lg hover:from-emerald-500 hover:to-emerald-400 transition-all"
-            >
-              Continue
-            </button>
-          </div>
-        </div>
-      )}
 
       {/* MENU SCREEN */}
       {gameState === 'menu' && (
@@ -2021,7 +1991,6 @@ export default function Kicker() {
                 setLastRaiser(-1);
                 setBettingRoundStarter(firstToAct);
                 setPlayerBroke(false);
-                setShowBrokeScreen(false);
                 setLocalPlayerSeat(null); // No single local player in pass & play
                 setSetupNames(['', '', '', '']);
                 setRoundHistory([]);
@@ -2083,7 +2052,17 @@ export default function Kicker() {
                     <button
                       onClick={() => {
                         if (localPlayerSeat !== null) return; // Already seated
-                        const name = localPlayerName.trim() || 'Player';
+                        let name = localPlayerName.trim() || 'Player';
+
+                        // Hidden feature: type "ai" to spectate (all AI game)
+                        const isAIMode = name.toLowerCase() === 'ai';
+                        if (isAIMode) {
+                          const currentSeated = seatedPlayers.filter(n => n !== null) as string[];
+                          const availableNames = AI_NAMES.filter(n => !currentSeated.includes(n));
+                          name = availableNames[Math.floor(Math.random() * availableNames.length)] || 'Player';
+                          setSpectatorMode(true);
+                        }
+
                         setSeatedPlayers(prev => {
                           const newSeats = [...prev];
                           newSeats[seatIndex] = name;
@@ -2144,7 +2123,8 @@ export default function Kicker() {
               onClick={() => {
                 // Set up the game with seated players
                 const names = seatedPlayers as string[];
-                const isAI = names.map((_, i) => i !== localPlayerSeat);
+                // In spectator mode, all players are AI
+                const isAI = spectatorMode ? names.map(() => true) : names.map((_, i) => i !== localPlayerSeat);
                 setPlayerNames(names);
                 setIsPlayerAI(isAI);
                 const newDealer = Math.floor(Math.random() * 4);
@@ -2265,11 +2245,12 @@ export default function Kicker() {
           onNextRound={handleNextRound}
           rollover={isRollover}
           onReplay={roundStartState ? handleReplayLastRound : undefined}
-          onNewGame={() => {
-            setGameState('menu');
+          playerBroke={playerBroke}
+          onReloadFunds={() => {
+            // Reset player state but keep name, go to lobby
             setSeatedPlayers([null, null, null, null]);
             setLocalPlayerSeat(null);
-            setLocalPlayerName('');
+            setSpectatorMode(false);
             setPlayers([
               { name: 'Player 1', chips: 50, card: null, revealed: false, folded: false, eliminated: false, peekedCards: [], currentBet: 0, totalRoundBet: 0, allIn: false },
               { name: 'Player 2', chips: 50, card: null, revealed: false, folded: false, eliminated: false, peekedCards: [], currentBet: 0, totalRoundBet: 0, allIn: false },
@@ -2279,6 +2260,25 @@ export default function Kicker() {
             setPot(0);
             setRolloverPot(0);
             setWinner(null);
+            setPlayerBroke(false);
+            setGameState('lobby');
+          }}
+          onNewGame={() => {
+            setGameState('menu');
+            setSeatedPlayers([null, null, null, null]);
+            setLocalPlayerSeat(null);
+            setLocalPlayerName('');
+            setSpectatorMode(false);
+            setPlayers([
+              { name: 'Player 1', chips: 50, card: null, revealed: false, folded: false, eliminated: false, peekedCards: [], currentBet: 0, totalRoundBet: 0, allIn: false },
+              { name: 'Player 2', chips: 50, card: null, revealed: false, folded: false, eliminated: false, peekedCards: [], currentBet: 0, totalRoundBet: 0, allIn: false },
+              { name: 'Player 3', chips: 50, card: null, revealed: false, folded: false, eliminated: false, peekedCards: [], currentBet: 0, totalRoundBet: 0, allIn: false },
+              { name: 'Player 4', chips: 50, card: null, revealed: false, folded: false, eliminated: false, peekedCards: [], currentBet: 0, totalRoundBet: 0, allIn: false },
+            ]);
+            setPot(0);
+            setRolloverPot(0);
+            setWinner(null);
+            setPlayerBroke(false);
           }}
         />
       )}
