@@ -1641,6 +1641,7 @@ export default function Kicker() {
     if (gameState !== 'playing' && gameState !== 'passing') return;
     if (!currentPlayerData?.aiLevel) return;
     if (winner) return;
+    if (showLowFundsPopup) return; // Pause for low funds popup
 
     // Base timings (ms) multiplied by aiSpeed
     const passDelay = 1200 * aiSpeed;
@@ -1673,7 +1674,7 @@ export default function Kicker() {
         return () => clearTimeout(timer);
       }
     }
-  }, [gameState, currentPlayer, showPassScreen, currentPlayerData?.aiLevel, winner, aiPendingAction, autoAI, aiSpeed]);
+  }, [gameState, currentPlayer, showPassScreen, currentPlayerData?.aiLevel, winner, aiPendingAction, autoAI, aiSpeed, showLowFundsPopup]);
 
   // Clear pending action when player changes
   useEffect(() => {
@@ -1684,6 +1685,19 @@ export default function Kicker() {
   useEffect(() => {
     winnerRef.current = winner;
   }, [winner]);
+
+  // Check for low funds during gameplay (single player mode only)
+  useEffect(() => {
+    if (localPlayerSeat === null) return; // Pass & Play mode
+    if (gameState !== 'playing' && gameState !== 'passing') return;
+    if (showLowFundsPopup) return; // Already showing
+    if (winner) return; // Round ended
+
+    const humanPlayer = players[localPlayerSeat];
+    if (humanPlayer && humanPlayer.chips <= 20 && !humanPlayer.eliminated && !humanPlayer.folded) {
+      setShowLowFundsPopup(true);
+    }
+  }, [players, gameState, localPlayerSeat, showLowFundsPopup, winner]);
 
 
   // Auto-advance replay at current AI speed
