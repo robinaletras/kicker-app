@@ -1677,16 +1677,20 @@ export default function Kicker() {
     if (!currentPlayerData?.aiLevel) return;
     if (winner) return;
 
-    // If player is broke, run AI instantly
+    // If player is broke, run AI with minimal delay (fast but not synchronous to avoid loops)
     if (playerBroke) {
       if (showPassScreen && gameState === 'passing') {
-        handleReady();
-        return;
+        const timer = setTimeout(() => {
+          handleReady();
+        }, 100);
+        return () => clearTimeout(timer);
       }
       if (gameState === 'playing' && !showPassScreen) {
-        const decision = makeAIDecision(currentPlayerData, currentPlayer);
-        handleAction(decision.action, decision.amount || 0);
-        return;
+        const timer = setTimeout(() => {
+          const decision = makeAIDecision(currentPlayerData, currentPlayer);
+          handleAction(decision.action, decision.amount || 0);
+        }, 100);
+        return () => clearTimeout(timer);
       }
     }
 
