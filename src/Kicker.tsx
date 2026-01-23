@@ -268,14 +268,14 @@ const WinnerScreen = ({ winner, pot, players, boardCard, onNextRound, rollover, 
   </div>
 );
 
-type GameState = 'menu' | 'lobby' | 'setup' | 'passing' | 'playing' | 'winner';
+type GameState = 'splash' | 'menu' | 'lobby' | 'setup' | 'passing' | 'playing' | 'winner';
 type Action = 'bet' | 'call' | 'raise' | 'check' | 'fold' | 'allIn';
 
 // Turn timer constants
 const TURN_TIME_LIMIT = 15; // seconds
 
 export default function Kicker() {
-  const [gameState, setGameState] = useState<GameState>('menu');
+  const [gameState, setGameState] = useState<GameState>('splash');
   const [communalCard, setCommunalCard] = useState<CardType | null>(null);
   const [players, setPlayers] = useState<Player[]>([
     { name: 'Player 1', chips: 100, card: null, revealed: false, folded: false, eliminated: false, peekedCards: [], currentBet: 0, totalRoundBet: 0, allIn: false },
@@ -1808,25 +1808,6 @@ export default function Kicker() {
     };
   }, [isMuted]);
 
-  // Start music on first user interaction (browsers block autoplay)
-  useEffect(() => {
-    const startAudioOnInteraction = () => {
-      if (audioRef.current && !isMuted) {
-        audioRef.current.play().catch(() => {});
-      }
-      // Remove listener after first interaction
-      document.removeEventListener('click', startAudioOnInteraction);
-      document.removeEventListener('touchstart', startAudioOnInteraction);
-    };
-
-    document.addEventListener('click', startAudioOnInteraction);
-    document.addEventListener('touchstart', startAudioOnInteraction);
-
-    return () => {
-      document.removeEventListener('click', startAudioOnInteraction);
-      document.removeEventListener('touchstart', startAudioOnInteraction);
-    };
-  }, [isMuted]);
 
 
   // Auto-advance replay at current AI speed
@@ -1934,6 +1915,35 @@ export default function Kicker() {
       >
         {isMuted ? '🔇' : '🔊'}
       </button>
+
+      {/* SPLASH SCREEN */}
+      {gameState === 'splash' && (
+        <div className="flex-1 flex flex-col items-center justify-center">
+          <div className="text-center">
+            <h1 className="font-display text-6xl sm:text-8xl text-transparent bg-clip-text bg-gradient-to-b from-amber-300 via-yellow-400 to-amber-500 drop-shadow-lg mb-4">
+              KICKER
+            </h1>
+            <p className="text-gray-400 text-lg mb-12">A Game of Cards & Bluffs</p>
+
+            <button
+              onClick={() => {
+                // Start music on this user interaction
+                if (audioRef.current && !isMuted) {
+                  audioRef.current.play().catch(() => {});
+                }
+                setGameState('menu');
+              }}
+              className="px-16 py-5 bg-gradient-to-r from-amber-600 to-amber-500 text-white rounded-xl font-bold text-2xl shadow-lg hover:from-amber-500 hover:to-amber-400 transition-all transform hover:scale-105"
+            >
+              Start
+            </button>
+
+            <div className="mt-12 text-gray-500 text-sm">
+              <p>4 players • 1 card each • Best kicker wins</p>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* MENU SCREEN */}
       {gameState === 'menu' && (
