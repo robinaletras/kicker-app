@@ -1049,23 +1049,25 @@ export default function Kicker() {
 
     // 9. High card
     console.log('Fell through to HIGH CARD - no pairs/trips detected!');
-    const sortedCards = [...allCards].sort((a, b) => b.value - a.value);
 
-    // Check if board is truly the highest card (no player card is higher)
-    const highestCard = sortedCards[0];
-    const boardIsTrulyHighest = highestCard.isBoard || highestCard.value === boardValue;
+    // Get highest card among NON-FOLDED players only
+    const eligibleCards = allCards.filter(c => !c.folded && !c.eliminated);
+    const sortedEligible = [...eligibleCards].sort((a, b) => b.value - a.value);
 
-    if (boardIsTrulyHighest) {
-      // Board is highest - everyone shares it, so rollover
+    // Check if board is higher than all non-folded player cards
+    const highestEligible = sortedEligible[0];
+    if (highestEligible.isBoard) {
+      // Board is highest among eligible - rollover
       console.log('Board has high card - rollover');
       return { name: 'Board', isSplit: false, reason: `${boardRank} high - Tie!`, rollover: true };
     }
 
-    // Board is NOT highest, so find highest non-folded player card
-    for (const card of sortedCards) {
-      if (card.isBoard || card.eliminated || card.folded) {
-        // Skip board and ineligible players
-        continue;
+    // Find highest non-folded player card
+    for (const card of sortedEligible) {
+      if (card.isBoard) {
+        // Board is highest - rollover
+        console.log('Board has high card - rollover');
+        return { name: 'Board', isSplit: false, reason: `${boardRank} high - Tie!`, rollover: true };
       }
       // Found highest eligible player card
       const highCardPlayers = activePlayers.filter(p => p.card!.value === card.value);
@@ -1084,7 +1086,7 @@ export default function Kicker() {
         };
       }
     }
-    // Fallback - no eligible winner (all folded/eliminated)
+    // Fallback - no eligible winner
     return { name: 'Board', isSplit: false, reason: `${boardRank} high - Tie!`, rollover: true };
   };
 
@@ -1095,7 +1097,7 @@ export default function Kicker() {
     // Calculate side pots based on totalRoundBet
     const activePlayers = newPlayers.filter(p => !p.folded && !p.eliminated);
 
-    // If only one active player, check if board is truly highest
+    // If only one active player, check if their card beats the board
     if (activePlayers.length === 1) {
       const lastPlayer = activePlayers[0];
       const potToUse = finalPot !== undefined ? finalPot : pot;
@@ -1103,35 +1105,26 @@ export default function Kicker() {
       const boardValue = communalCard!.value;
       const boardRank = communalCard!.rank;
 
-      // Check if ANY card (including folded players) is higher than board
-      const allPlayerCards = newPlayers.filter(p => p.card).map(p => p.card!.value);
-      const highestPlayerCard = Math.max(...allPlayerCards);
-      const boardIsTrulyHighest = boardValue >= highestPlayerCard;
-
       // Player wins if they pair with board OR have higher card than board
       const pairsWithBoard = playerCard.value === boardValue;
+      const beatsBoard = playerCard.value > boardValue;
 
-      if (pairsWithBoard) {
-        // Player pairs with board - they win
+      if (pairsWithBoard || beatsBoard) {
+        // Player wins
         newPlayers = newPlayers.map(p =>
           p.name === lastPlayer.name ? { ...p, chips: p.chips + potToUse } : p
         );
         setPlayers(newPlayers);
-        setWinner({ name: lastPlayer.name, isSplit: false, reason: `Pair of ${playerCard.rank}s (with board)`, rollover: false });
+        const reason = pairsWithBoard
+          ? `Pair of ${playerCard.rank}s (with board)`
+          : `${playerCard.rank} high`;
+        setWinner({ name: lastPlayer.name, isSplit: false, reason, rollover: false });
         setRolloverPot(0);
-      } else if (boardIsTrulyHighest) {
-        // Board is truly the highest card - everyone ties on it, rollover
+      } else {
+        // Board is higher - rollover
         setPlayers(newPlayers);
         setWinner({ name: 'Board', isSplit: false, reason: `${boardRank} high - Tie!`, rollover: true });
         setRolloverPot(potToUse + rolloverPot);
-      } else {
-        // Some card is higher than board, last player wins as only non-folded player
-        newPlayers = newPlayers.map(p =>
-          p.name === lastPlayer.name ? { ...p, chips: p.chips + potToUse } : p
-        );
-        setPlayers(newPlayers);
-        setWinner({ name: lastPlayer.name, isSplit: false, reason: `${playerCard.rank} high`, rollover: false });
-        setRolloverPot(0);
       }
       setGameState('winner');
       return;
