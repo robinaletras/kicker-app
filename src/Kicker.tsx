@@ -389,7 +389,15 @@ export default function Kicker() {
     const aiRaises = aiRaiseCount[playerIndex] || 0;
     const canRaise = aiRaises < 2;
 
-    // Get revealed cards that are higher than mine
+    // Check if I pair with the board (guaranteed win or split)
+    const pairsWithBoard = communalCard && communalCard.value === myCard.value;
+
+    // Check if any revealed card matches mine (would split with them)
+    const wouldSplitWithRevealed = players.some(
+      p => p.revealed && !p.folded && !p.eliminated && p.card && p.card.value === myCard.value && p !== player
+    );
+
+    // Get revealed cards that are STRICTLY higher than mine (not equal)
     const revealedHigherCards = players.filter(
       p => p.revealed && !p.folded && !p.eliminated && p.card && p.card.value > myCard.value
     );
@@ -397,19 +405,24 @@ export default function Kicker() {
     // Check if board is higher than my card
     const boardHigher = communalCard && communalCard.value > myCard.value;
 
-    // Check if I pair with the board
-    const pairsWithBoard = communalCard && communalCard.value === myCard.value;
+    // NEVER fold if we would split or win
+    const shouldNeverFold = pairsWithBoard || wouldSplitWithRevealed;
 
     // If can't afford to call, must fold or go all-in
     if (!canAffordCall && toCall > 0) {
-      // Go all-in if we have a good hand
-      if (pairsWithBoard || aiLevel === 'aggressive') {
+      // Go all-in if we have a good hand or would split
+      if (shouldNeverFold || aiLevel === 'aggressive') {
         return { action: 'call' }; // Will be limited to all-in by handleAction
       }
       return { action: 'fold' };
     }
 
     if (aiLevel === 'cautious') {
+      // Never fold if we'd split or win
+      if (shouldNeverFold) {
+        if (canCheck) return { action: 'check' };
+        return { action: 'call' };
+      }
       // Folds when a higher card is revealed or board is higher
       if (revealedHigherCards.length > 0 || boardHigher) {
         if (canCheck) return { action: 'check' };
@@ -424,8 +437,13 @@ export default function Kicker() {
     }
 
     if (aiLevel === 'random') {
-      // 30% chance to fold if there's a bet (unless pairs with board)
-      if (!pairsWithBoard && toCall > 0 && Math.random() < 0.3) {
+      // Never fold if we'd split or win
+      if (shouldNeverFold) {
+        if (canCheck) return { action: 'check' };
+        return { action: 'call' };
+      }
+      // 30% chance to fold if there's a bet
+      if (toCall > 0 && Math.random() < 0.3) {
         return { action: 'fold' };
       }
       // 20% chance to bet/raise if we can afford it AND haven't raised too much
@@ -628,18 +646,32 @@ export default function Kicker() {
     const maxBet = availableChips;
     const maxRaise = availableChips - toCall;
 
+    const pairsWithBoard = boardCard.value === myCard.value;
+
+    // Check if any revealed card matches mine (would split with them)
+    const wouldSplitWithRevealed = allPlayers.some(
+      p => p.revealed && !p.folded && !p.eliminated && p.card && p.card.value === myCard.value && p !== player
+    );
+
     const revealedHigherCards = allPlayers.filter(
       p => p.revealed && !p.folded && !p.eliminated && p.card && p.card.value > myCard.value
     );
     const boardHigher = boardCard.value > myCard.value;
-    const pairsWithBoard = boardCard.value === myCard.value;
+
+    // NEVER fold if we would split or win
+    const shouldNeverFold = pairsWithBoard || wouldSplitWithRevealed;
 
     if (!canAffordCall && toCall > 0) {
-      if (pairsWithBoard || aiLevel === 'aggressive') return { action: 'call' };
+      if (shouldNeverFold || aiLevel === 'aggressive') return { action: 'call' };
       return { action: 'fold' };
     }
 
     if (aiLevel === 'cautious') {
+      // Never fold if we'd split or win
+      if (shouldNeverFold) {
+        if (canCheck) return { action: 'check' };
+        return { action: 'call' };
+      }
       if (revealedHigherCards.length > 0 || boardHigher) {
         if (canCheck) return { action: 'check' };
         return { action: 'fold' };
@@ -652,7 +684,12 @@ export default function Kicker() {
     }
 
     if (aiLevel === 'random') {
-      if (!pairsWithBoard && toCall > 0 && Math.random() < 0.3) return { action: 'fold' };
+      // Never fold if we'd split or win
+      if (shouldNeverFold) {
+        if (canCheck) return { action: 'check' };
+        return { action: 'call' };
+      }
+      if (toCall > 0 && Math.random() < 0.3) return { action: 'fold' };
       if (canRaiseMore && Math.random() < 0.2) {
         const amount = Math.min(Math.floor(Math.random() * 3) + 1, canCheck ? maxBet : maxRaise);
         if (amount > 0) {
