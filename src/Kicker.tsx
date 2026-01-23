@@ -365,8 +365,8 @@ export default function Kicker() {
     const playerList = playersToCheck || players;
     let next = (fromIndex + 1) % 4;
     let attempts = 0;
-    // Skip folded, eliminated, AND all-in players (they can't act)
-    while ((playerList[next].folded || playerList[next].eliminated || playerList[next].allIn) && attempts < 4) {
+    // Skip folded, eliminated, all-in, AND broke players (they can't act)
+    while ((playerList[next].folded || playerList[next].eliminated || playerList[next].allIn || playerList[next].chips <= 0) && attempts < 4) {
       next = (next + 1) % 4;
       attempts++;
     }
@@ -1169,7 +1169,8 @@ export default function Kicker() {
     const playersToUse = updatedPlayers || players;
     const potToUse = updatedPot !== undefined ? updatedPot : pot;
     const activePlayers = playersToUse.filter(p => !p.folded && !p.eliminated);
-    const playersWhoCanAct = playersToUse.filter(p => !p.folded && !p.eliminated && !p.allIn);
+    // Players who can act: not folded, not eliminated, not all-in, AND have chips
+    const playersWhoCanAct = playersToUse.filter(p => !p.folded && !p.eliminated && !p.allIn && p.chips > 0);
     const lastRaiserToUse = newLastRaiser !== undefined ? newLastRaiser : lastRaiser;
     const currentBetToUse = newCurrentBet !== undefined ? newCurrentBet : currentBetAmount;
 
@@ -1643,7 +1644,7 @@ export default function Kicker() {
               i === currentPlayer ? { ...p, allIn: true } : p
             );
             setPlayers(newPlayers);
-            advanceToNextPlayer();
+            advanceToNextPlayer(newPlayers, pot);
           }
         }, playerBroke ? 50 : 500);
         return () => clearTimeout(timer);
