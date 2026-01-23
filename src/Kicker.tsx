@@ -931,21 +931,36 @@ export default function Kicker() {
     // 2. Four of a kind (rare but possible)
     if (quads) {
       const quadRank = allCards.find(c => c.value === quads!.value)?.rank || '';
-      const handDescription = `Four ${quadRank}s`;
-      const usedValues = new Set([quads.value]);
-      return resolveByHandMaker(handDescription, usedValues, quads.players);
+      const eligibleQuadPlayers = activePlayers.filter(p => p.card!.value === quads!.value);
+
+      if (eligibleQuadPlayers.length > 0) {
+        const handDescription = `Four ${quadRank}s`;
+        const usedValues = new Set([quads.value]);
+        return resolveByHandMaker(handDescription, usedValues, eligibleQuadPlayers);
+      }
+      // All quad-makers folded, fall through
+      console.log('All quad-makers folded, falling through');
     }
 
     // 3. Full House
     if (isFullHouse) {
-      const tripRank = allCards.find(c => c.value === trips!.value)?.rank || '';
-      const pairRank = allCards.find(c => c.value === pairs[0].value)?.rank || '';
-      const handDescription = `Full House, ${tripRank}s full of ${pairRank}s`;
+      // Check if any non-folded players are part of the trips or pair
+      const tripPlayers = activePlayers.filter(p => p.card!.value === trips!.value);
+      const pairPlayers = activePlayers.filter(p => p.card!.value === pairs[0].value);
 
-      // Each player has only ONE card, so no one can own both trips AND pair
-      // Full house is always a shared hand - rollover
-      console.log('Full house - shared hand, rollover');
-      return { name: 'Tie', isSplit: false, reason: `${handDescription} - Tie!`, rollover: true };
+      // Only count as full house if at least one non-folded player is part of trips AND pair
+      if (tripPlayers.length > 0 && pairPlayers.length > 0) {
+        const tripRank = allCards.find(c => c.value === trips!.value)?.rank || '';
+        const pairRank = allCards.find(c => c.value === pairs[0].value)?.rank || '';
+        const handDescription = `Full House, ${tripRank}s full of ${pairRank}s`;
+
+        // Each player has only ONE card, so no one can own both trips AND pair
+        // Full house is always a shared hand - rollover
+        console.log('Full house - shared hand, rollover');
+        return { name: 'Tie', isSplit: false, reason: `${handDescription} - Tie!`, rollover: true };
+      }
+      // If trips or pair are entirely folded, fall through to flush/straight/trips check
+      console.log('Full house but trips or pair entirely folded, falling through');
     }
 
     // 4. Flush
@@ -990,23 +1005,40 @@ export default function Kicker() {
     // 6. Three of a kind
     if (trips) {
       const tripRank = allCards.find(c => c.value === trips!.value)?.rank || '';
-      const handDescription = `Three ${tripRank}s`;
-      const usedValues = new Set([trips.value]);
-      return resolveByHandMaker(handDescription, usedValues, trips.players);
+      // Find non-folded players who have this card value
+      const eligibleTripPlayers = activePlayers.filter(p => p.card!.value === trips!.value);
+
+      if (eligibleTripPlayers.length > 0) {
+        const handDescription = `Three ${tripRank}s`;
+        const usedValues = new Set([trips.value]);
+        return resolveByHandMaker(handDescription, usedValues, eligibleTripPlayers);
+      }
+      // All trip-makers folded, fall through
+      console.log('All trip-makers folded, falling through');
     }
 
     // 7. Two pair
     if (pairs.length >= 2) {
-      const pair1Rank = allCards.find(c => c.value === pairs[0].value)?.rank || '';
-      const pair2Rank = allCards.find(c => c.value === pairs[1].value)?.rank || '';
-      const handDescription = `Two Pair, ${pair1Rank}s and ${pair2Rank}s`;
-      const usedValues = new Set([pairs[0].value, pairs[1].value]);
-      const kickerDesc = getKickerDescription(usedValues);
+      // Check if any non-folded players are part of either pair
+      const pair1Players = activePlayers.filter(p => p.card!.value === pairs[0].value);
+      const pair2Players = activePlayers.filter(p => p.card!.value === pairs[1].value);
 
-      // For two pair, no single player "owns" both pairs
-      // So it's a shared hand - rollover
-      console.log('Two pair detected - rollover (no single owner)');
-      return { name: 'Tie', isSplit: false, reason: `${handDescription}${kickerDesc} - Tie!`, rollover: true };
+      // Only count as two pair if at least one non-folded player is part of each pair
+      // (otherwise it's not really "two pair" for the active players)
+      if (pair1Players.length > 0 && pair2Players.length > 0) {
+        const pair1Rank = allCards.find(c => c.value === pairs[0].value)?.rank || '';
+        const pair2Rank = allCards.find(c => c.value === pairs[1].value)?.rank || '';
+        const handDescription = `Two Pair, ${pair1Rank}s and ${pair2Rank}s`;
+        const usedValues = new Set([pairs[0].value, pairs[1].value]);
+        const kickerDesc = getKickerDescription(usedValues);
+
+        // For two pair, no single player "owns" both pairs
+        // So it's a shared hand - rollover
+        console.log('Two pair detected - rollover (no single owner)');
+        return { name: 'Tie', isSplit: false, reason: `${handDescription}${kickerDesc} - Tie!`, rollover: true };
+      }
+      // If one or both pairs are entirely folded players, fall through to one pair check
+      console.log('Two pair but some pairs entirely folded, checking for one pair');
     }
 
     // 8. One pair
@@ -1015,36 +1047,43 @@ export default function Kicker() {
       const pairValue = pairs[0].value;
       const includesBoard = pairs[0].includesBoard;
 
-      // Find ALL players who have this card value (not just from pairs array)
+      // Find non-folded players who have this card value
       const playersWithPairValue = activePlayers.filter(p => p.card!.value === pairValue);
 
       console.log('One pair detected:', pairRank, 'includesBoard:', includesBoard);
       console.log('Players with pair value:', playersWithPairValue.map(p => p.name));
 
-      if (includesBoard) {
-        // Player pairs with board - they win (or split if multiple players pair with board, which would be trips)
-        const handDescription = `Pair of ${pairRank}s (with board)`;
-        const usedValues = new Set([pairValue]);
-        return resolveByHandMaker(handDescription, usedValues, playersWithPairValue);
-      } else {
-        // Player pair (two players have same card) - they split
-        const handDescription = `Pair of ${pairRank}s`;
-        const usedValues = new Set([pairValue]);
+      // Only count the pair if at least one non-folded player is part of it
+      if (playersWithPairValue.length > 0) {
+        if (includesBoard) {
+          // Player pairs with board - they win (or split if multiple players pair with board, which would be trips)
+          const handDescription = `Pair of ${pairRank}s (with board)`;
+          const usedValues = new Set([pairValue]);
+          return resolveByHandMaker(handDescription, usedValues, playersWithPairValue);
+        } else if (playersWithPairValue.length >= 1) {
+          // At least one non-folded player has the pair card - they win with it
+          // (The other pair-maker may have folded, but the pair still exists)
+          const handDescription = `Pair of ${pairRank}s`;
+          const usedValues = new Set([pairValue]);
 
-        // Ensure we include ALL players with this card value
-        if (playersWithPairValue.length >= 2) {
-          console.log('Player pair - splitting between:', playersWithPairValue.map(p => p.name));
-          return {
-            name: playersWithPairValue.map(p => p.name).join(' & '),
-            isSplit: true,
-            players: playersWithPairValue,
-            reason: `${handDescription}${getKickerDescription(usedValues)}`,
-            rollover: false
-          };
+          if (playersWithPairValue.length >= 2) {
+            // Multiple non-folded players have the pair - they split
+            console.log('Player pair - splitting between:', playersWithPairValue.map(p => p.name));
+            return {
+              name: playersWithPairValue.map(p => p.name).join(' & '),
+              isSplit: true,
+              players: playersWithPairValue,
+              reason: `${handDescription}${getKickerDescription(usedValues)}`,
+              rollover: false
+            };
+          }
+
+          // One non-folded player has the pair card - they win
+          return resolveByHandMaker(handDescription, usedValues, playersWithPairValue);
         }
-
-        return resolveByHandMaker(handDescription, usedValues, playersWithPairValue);
       }
+      // If all pair-makers folded, fall through to high card
+      console.log('All pair-makers folded, falling through to high card');
     }
 
     // 9. High card
