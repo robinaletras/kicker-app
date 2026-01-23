@@ -295,9 +295,8 @@ export default function Kicker() {
   const [showPassScreen, setShowPassScreen] = useState(false);
   const [winner, setWinner] = useState<Winner | null>(null);
   const [isRollover, setIsRollover] = useState(false);
-  const [reloadNotification, setReloadNotification] = useState(false); // Show funds reloaded notification
+  const [showLowFundsPopup, setShowLowFundsPopup] = useState(false); // Force replenish or leave
   const winnerRef = useRef<Winner | null>(null); // Track winner for closures
-  const reloadedThisRoundRef = useRef(false); // Prevent multiple reloads per round
   const [playerNames, setPlayerNames] = useState(['Player 1', 'Player 2', 'Player 3', 'Player 4']);
   const [isPlayerAI, setIsPlayerAI] = useState([false, false, false, false]);
   const [setupNames, setSetupNames] = useState(['', '', '', '']); // Pass & Play setup names
@@ -1677,32 +1676,15 @@ export default function Kicker() {
     winnerRef.current = winner;
   }, [winner]);
 
-  // Auto-reload chips when human player goes broke (once per round)
+  // Check for low funds when round ends - show popup if chips <= 20
   useEffect(() => {
-    if (gameState !== 'playing' && gameState !== 'passing') return;
-    if (reloadedThisRoundRef.current) return; // Already reloaded this round
-
+    if (gameState !== 'winner') return;
     const humanPlayerIndex = localPlayerSeat !== null ? localPlayerSeat : 0;
     const humanPlayer = players[humanPlayerIndex];
-    if (humanPlayer && humanPlayer.chips <= 0 && !humanPlayer.eliminated && !humanPlayer.allIn) {
-      reloadedThisRoundRef.current = true;
-      // Auto-reload their chips
-      const newPlayers = players.map((p, i) =>
-        i === humanPlayerIndex ? { ...p, chips: 50 } : p
-      );
-      setPlayers(newPlayers);
-      setReloadNotification(true);
-      // Auto-hide notification after 3 seconds
-      setTimeout(() => setReloadNotification(false), 3000);
+    if (humanPlayer && humanPlayer.chips <= 20 && !humanPlayer.eliminated) {
+      setShowLowFundsPopup(true);
     }
-  }, [players, gameState, localPlayerSeat]);
-
-  // Reset reload flag when round ends
-  useEffect(() => {
-    if (gameState === 'winner' || gameState === 'menu' || gameState === 'lobby') {
-      reloadedThisRoundRef.current = false;
-    }
-  }, [gameState]);
+  }, [gameState, players, localPlayerSeat]);
 
   // Auto-advance replay at current AI speed
   useEffect(() => {
@@ -2300,12 +2282,6 @@ export default function Kicker() {
               </div>
             )}
 
-            {/* Funds Reloaded Notification */}
-            {reloadNotification && (
-              <div className="mb-2 px-4 py-3 bg-emerald-900/80 rounded-lg border border-emerald-500 flex-shrink-0 text-center animate-pulse">
-                <div className="text-emerald-300 font-bold">Funds Reloaded! +$50</div>
-              </div>
-            )}
 
             {/* Game Info */}
             <div className="flex justify-between items-center mb-2 px-4 py-2 bg-gray-900/80 rounded-lg border border-emerald-800 flex-shrink-0">
@@ -2604,6 +2580,47 @@ export default function Kicker() {
           </div>
         )}
       </div>
+
+      {/* Low Funds Popup */}
+      {showLowFundsPopup && (
+        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-[100]">
+          <div className="bg-gray-900 border-2 border-amber-500 rounded-xl p-6 max-w-sm mx-4 text-center">
+            <h2 className="font-display text-2xl text-amber-400 mb-3">Low Funds!</h2>
+            <p className="text-gray-300 mb-6">
+              You have ${players[localPlayerSeat !== null ? localPlayerSeat : 0]?.chips || 0} remaining.
+              You must replenish your funds or leave the table.
+            </p>
+            <div className="flex flex-col gap-3">
+              <button
+                onClick={() => {
+                  const humanPlayerIndex = localPlayerSeat !== null ? localPlayerSeat : 0;
+                  const newPlayers = players.map((p, i) =>
+                    i === humanPlayerIndex ? { ...p, chips: p.chips + 50 } : p
+                  );
+                  setPlayers(newPlayers);
+                  setShowLowFundsPopup(false);
+                }}
+                className="px-6 py-3 bg-gradient-to-r from-emerald-600 to-emerald-500 text-white rounded-xl font-bold text-lg shadow-lg hover:from-emerald-500 hover:to-emerald-400 transition-all"
+              >
+                Replenish +$50
+              </button>
+              <button
+                onClick={() => {
+                  setShowLowFundsPopup(false);
+                  setGameState('menu');
+                  setSeatedPlayers([null, null, null, null]);
+                  setLocalPlayerSeat(null);
+                  setLocalPlayerName('');
+                  setWinner(null);
+                }}
+                className="px-6 py-2 text-gray-400 hover:text-gray-200 transition-colors"
+              >
+                Leave Table
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
