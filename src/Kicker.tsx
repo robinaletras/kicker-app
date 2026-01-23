@@ -1797,7 +1797,7 @@ export default function Kicker() {
       audioRef.current.pause();
     } else {
       audioRef.current.play().catch(() => {
-        // Autoplay blocked - user needs to interact first
+        // Autoplay blocked - will start on first user interaction
       });
     }
 
@@ -1805,6 +1805,26 @@ export default function Kicker() {
       if (audioRef.current) {
         audioRef.current.pause();
       }
+    };
+  }, [isMuted]);
+
+  // Start music on first user interaction (browsers block autoplay)
+  useEffect(() => {
+    const startAudioOnInteraction = () => {
+      if (audioRef.current && !isMuted) {
+        audioRef.current.play().catch(() => {});
+      }
+      // Remove listener after first interaction
+      document.removeEventListener('click', startAudioOnInteraction);
+      document.removeEventListener('touchstart', startAudioOnInteraction);
+    };
+
+    document.addEventListener('click', startAudioOnInteraction);
+    document.addEventListener('touchstart', startAudioOnInteraction);
+
+    return () => {
+      document.removeEventListener('click', startAudioOnInteraction);
+      document.removeEventListener('touchstart', startAudioOnInteraction);
     };
   }, [isMuted]);
 
